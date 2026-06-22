@@ -77,7 +77,7 @@ uint32_t black, white;
 
 void init_x() {
     disp = XOpenDisplay((char *)0);
-    screen = DefaultScreen(disp);
+    screen = DefaultScreen(disp);   
 
 
     black = BlackPixel(disp, screen);
@@ -110,9 +110,9 @@ void init_x() {
     XSetWMIconName(disp, win, &x_icon_name);
 
     neko_map = XCreatePixmapFromBitmapData(disp, win, neko_bits, neko_width, neko_height, black, white, DefaultDepth(disp, screen));
-    
-    b_arr = XCreatePixmapFromBitmapData(disp, win, petal_cursor_bits, petal_cursor_width, petal_cursor_height, 1, 0, 1);
-    f_arr = XCreatePixmapFromBitmapData(disp, win, petal_cursor_mask_bits, petal_cursor_mask_width, petal_cursor_mask_height, 1, 0, 1);
+
+    b_arr = XCreatePixmapFromBitmapData(disp, win, petal_cursor_mask_bits, petal_cursor_mask_width, petal_cursor_mask_height, 1, 0, 1);
+    f_arr = XCreatePixmapFromBitmapData(disp, win, petal_cursor_bits, petal_cursor_width, petal_cursor_height, 1, 0, 1);
 
     // printf("b_arr = %d\n", b_arr);
 
@@ -140,9 +140,9 @@ void init_x() {
     );
 
 
-    // gc = XCreateGC(disp, win, 0, NULL);
-    // XSetForeground(disp, gc, black);
-    // XSetBackground(disp, gc, white);
+    gc = XCreateGC(disp, win, 0, NULL);
+    XSetForeground(disp, gc, black);
+    XSetBackground(disp, gc, white);
     // attr.background_pixel = BlackPixel(disp, screen);
 
     // rover = XCreateWindow(
@@ -159,10 +159,11 @@ void init_x() {
 
 void close_x() {
     XFreeGC(disp, gc);
-    XDestroyWindow(disp, win);
     XDestroyWindow(disp, w_win);
 
     XDestroyWindow(disp, b_win);
+    XDestroyWindow(disp, win);
+
 
     XCloseDisplay(disp);
 
@@ -193,12 +194,12 @@ int main() {
         //     }
         //     break;
         
-        // case KeyPress:
-        //     if (XLookupString(&event.xkey, text, 255, &key, 0) == 1) {
-        //         if (text[0] == 'q') {
-        //             close_x();
-        //         }
-        //     }
+        case KeyPress:
+            if (XLookupString(&event.xkey, text, 255, &key, 0) == 1) {
+                if (text[0] == 'q') {
+                    close_x();
+                }
+            }
         }
         
         // if (event.type == Expose && event.xexpose.count == 0) {
