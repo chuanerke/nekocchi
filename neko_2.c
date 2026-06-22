@@ -35,16 +35,16 @@ Window create_win(Display *disp) {
     Window temp_win;
 
     uint32_t value_mask;
-    XSetWindowAttributes *attr;
+    XSetWindowAttributes attr;
 
-    attr->border_pixel = BlackPixel(disp, screen);
-    attr->event_mask = ExposureMask | ButtonPressMask | StructureNotifyMask;
+    attr.border_pixel = BlackPixel(disp, screen);
+    attr.event_mask = ExposureMask | ButtonPressMask | StructureNotifyMask;
 
     value_mask = CWBorderPixel | CWEventMask;
-    temp_win = XCreateWIndow(
+    temp_win = XCreateWindow(
         disp, RootWindow(disp, screen), 0, 0, neko_width, neko_height, 1, 
         DefaultDepth(disp, screen), InputOutput, DefaultVisual(disp, screen), 
-        value_mask, attr
+        value_mask, &attr
     );
 
     XMapWindow(disp, temp_win);
@@ -52,7 +52,7 @@ Window create_win(Display *disp) {
     return temp_win;
 }
 
-void set_hints(Disp *disp, Window win) {
+void set_hints(Display *disp, Window win) {
     XWMHints *wm_hints = XAllocWMHints();
     XSizeHints *wm_size = XAllocSizeHints();
 
@@ -70,7 +70,7 @@ void set_hints(Disp *disp, Window win) {
     XFree(wm_size);
 }
 
-GC create_gc(Disp *disp, Window win) {
+GC create_gc(Display *disp, Window win) {
     GC gc;
     int value_mask = 0;
     XGCValues values;
@@ -84,17 +84,58 @@ GC create_gc(Disp *disp, Window win) {
     gc = XCreateGC(disp, win, value_mask, &values);
 
     return gc;
+} 
+
+Pixmap initial_draw(Display *disp, Window win) {
+    int screen = DefaultScreen(disp);
+    Pixmap init_neko = XCreatePixmapFromBitmapData(
+        disp, win, neko_bits, neko_width, neko_height, 
+        BlackPixel(disp, screen), WhitePixel(disp, screen), 
+        DefaultDepth(disp, screen) 
+    );
+
+    XShapeCombineMask(disp, win, ShapeBounding, 0, 0, init_neko, ShapeSet);
+
+
+    return init_neko;
 }
 
-void 
-
 int main() {
-    Disp *disp;
+    Display *disp;
     Window root_win;
+    int screen;
+    GC gc;
 
+    disp = XOpenDisplay((char *)0);
+    screen = DefaultScreen(disp);
+    root_win = create_win(disp);
+
+    set_hints(disp, root_win);
+
+    gc = create_gc(disp, root_win);
+    Pixmap neko = initial_draw(disp, root_win);
+
+    XEvent event;
 
     for ( ;; ) {
+        XNextEvent(disp, &event);
 
+        switch (event.type) {
+        case Expose:
+            XCopyPlane(disp, neko, root_win, gc, 0, 0, neko_width, neko_height, 0, 0, 1);
+            break;
+        case ButtonPress:
+            if (event.xbutton.button == Button1) {
+                XFreeGC(disp, gc);
+                // XFreePixmap(neko);
+                XDestroyWindow(disp, root_win);
+                XCloseDisplay(disp);
+                exit(1);
+            }
+            break;
+        }
+        
     }
 
+    return 0;
 }
