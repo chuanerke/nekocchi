@@ -99,16 +99,18 @@ void set_hints(Display *disp, Window win) {
 
 GC create_gc(Display *disp, Window win) {
     GC gc;
-    int value_mask = 0;
-    XGCValues values;
-    values.background = BlackPixel(disp, DefaultScreen(disp));
-    values.foreground = WhitePixel(disp, DefaultScreen(disp));
-    values.line_style = LineSolid;
-    values.cap_style = CapButt;
-    values.join_style = JoinBevel;
+    // int value_mask = 0;
+    // XGCValues values;
+    // values.background = WhitePixel(disp, DefaultScreen(disp));
+    // values.foreground = BlackPixel(disp, DefaultScreen(disp));
+    // values.line_style = LineSolid;
+    // values.cap_style = CapButt;
+    // values.join_style = JoinBevel;
 
     // will it even check the values without mask val?
-    gc = XCreateGC(disp, win, value_mask, &values);
+    gc = XCreateGC(disp, win, 0, NULL);
+    XSetForeground(disp, gc, BlackPixel(disp, DefaultScreen(disp)));
+    XSetBackground(disp, gc, WhitePixel(disp, DefaultScreen(disp)));
 
     return gc;
 } 
@@ -158,10 +160,11 @@ int main() {
     for ( ;; ) {
         XNextEvent(disp, &event);
 
+
         switch (event.type) {
         case Expose:
             XCopyPlane(disp, neko, root_win, gc, 0, 0, neko_width, neko_height, 0, 0, 1);
-            printf("e");
+
             break;
         case ButtonPress:
             if (event.xbutton.button == Button1) {
@@ -170,6 +173,8 @@ int main() {
                 XDestroyWindow(disp, root_win);
                 XCloseDisplay(disp);
                 exit(1);
+
+
             }
             break;
         }
