@@ -42,6 +42,8 @@ static char awake_mask_bits[] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
+static int w_depth;
+
 
 // Window  XCreateWindow(Display  *display,  Window  parent,  int  x, int y, unsigned int width, unsigned int
 //             height, unsigned int border_width, int depth, unsigned int class,  Visual  *visual,  unsigned  long
@@ -51,6 +53,7 @@ Window create_win(Display *disp) {
     screen = DefaultScreen(disp);
     Window temp_win;
     
+    w_depth = DefaultDepth(disp, screen);
 
     uint32_t value_mask;
     XSetWindowAttributes attr;
@@ -67,7 +70,7 @@ Window create_win(Display *disp) {
 
     temp_win = XCreateWindow(
         disp, RootWindow(disp, screen), 0, 0, neko_width, neko_height, 0, 
-        DefaultDepth(disp, screen), InputOutput, CopyFromParent, 
+        w_depth, InputOutput, CopyFromParent, 
         value_mask, &attr
     );
 
@@ -120,23 +123,25 @@ Pixmap initial_draw(Display *disp, Window win) {
     Pixmap init_neko = XCreatePixmapFromBitmapData(
         disp, RootWindow(disp, screen), neko_bits, neko_width, neko_height, 
         BlackPixel(disp, screen), WhitePixel(disp, screen), 
-        DefaultDepth(disp, screen) 
+        1
     );
 
+
+    // IMPORTANT : IF DEPTH NOT AT 1 IT WILL NOT WORK, I WILL SEE WHY LATER
     Pixmap neko_mask = XCreatePixmapFromBitmapData(
         disp, RootWindow(disp, screen), awake_mask_bits, awake_mask_width, awake_mask_height, 
-        BlackPixel(disp, screen), WhitePixel(disp, screen), 
-        DefaultDepth(disp, screen) 
+        WhitePixel(disp, screen), BlackPixel(disp, screen), 
+        1
     );
 
     // printf("%d\n", init_neko);
-    XMapWindow(disp, win);
-    XFlush(disp);
 
     // XCopyPlane(disp, init_neko, win, gc, 0, 0, neko_width, neko_height, 0, 0, 1);
+    // printf("%d", w_depth);
+    XShapeCombineMask(disp, win, ShapeBounding, 0, 0, neko_mask, ShapeSet);
+        XMapWindow(disp, win);
+    // XFlush(disp);
 
-    // XShapeCombineMask(disp, win, ShapeBounding, 0, 0, neko_mask, ShapeSet);
-    
     return init_neko;
 }
 
