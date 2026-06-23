@@ -62,9 +62,6 @@ Window create_win(Display *disp) {
     value_mask = CWBackPixel | CWEventMask | CWOverrideRedirect;
     attr.background_pixel = BlackPixel(disp, screen);
 
-    // unsigned int root_width, root_height;
-    // XGetGeometry(disp, RootWindow(disp, screen), NULL, NULL, NULL, &root_width, &root_height, NULL, NULL);
-
     unsigned int win_x, win_y;
     win_x = (DisplayWidth(disp, screen) - (neko_width / 2)) / 2;
     win_y = (DisplayHeight(disp, screen) - (neko_height / 2)) / 2;
@@ -130,10 +127,45 @@ Pixmap initial_draw(Display *disp, Window win) {
 }
 
 
-
 void move_neko(Display *disp, Window win, int x, int y) {
     int err = XMoveWindow(disp, win, x, y); 
 }
+
+
+// Bool  XQueryPointer(Display *display, Window w, Window *root_return, Window *child_return, int *root_x_re‐
+//     turn, int *root_y_return, int *win_x_return, int *win_y_return, unsigned int *mask_return);
+
+    //  Status XGetGeometry(Display *display, Drawable d, Window *root_return, int *x_return, int  *y_return,  un‐
+    //         signed  int *width_return, unsigned int *height_return, unsigned int *border_width_return, unsigned
+    //         int *depth_return);
+
+
+
+void neko_move(Display *disp, Window win) {
+    Window root_ret, child_ret;
+    int root_x, root_y, win_x, win_y;
+    unsigned int mask_ret;
+
+    _Bool xq_ret = XQueryPointer(
+        disp, win, &root_ret, &child_ret, &root_x, 
+        &root_y, &win_x, &win_y, &mask_ret
+    );
+    if (!xq_ret) {
+        fprintf(stderr, "XQueryPointer: Pointer not on same screen\n");
+        return;
+    }
+
+    int neko_x, neko_y;
+    unsigned int width_ret, height_ret, border_width_ret, dept_ret;
+
+    XGetGeometry(disp, win, &root_ret, &neko_x, &neko_y, &width_ret, &height_ret, &border_width_ret, &dept_ret);
+
+
+    printf("X: %d, Y: %d\n", root_x, root_y);
+    printf("NX: %d, NY: %d\n", neko_x, neko_y);
+
+}
+
 
 
 int main() {
@@ -154,27 +186,31 @@ int main() {
     XEvent event;
     int x = 0;
     int y = 0;
-    printf("%d\n", w_depth);
+
 
     // XCopyPlane(disp, neko, root_win, gc, 0, 0, neko_width, neko_height, 0, 0, 1);
-
+    int c = 0;
     for ( ;; ) {
-        XNextEvent(disp, &event);
+        neko_move(disp, root_win);
+        // XFree(win_name);
+
         // move_neko(disp, root_win, ++x, ++y);
         // sleep(1);
-
-        switch (event.type) {
-        case Expose:
-            XCopyPlane(disp, neko, root_win, gc, 0, 0, neko_width, neko_height, 0, 0, 1);
-            break;
-        case ButtonPress:
-            if (event.xbutton.button == Button1) {
-                XFreeGC(disp, gc);
-                XDestroyWindow(disp, root_win);
-                XCloseDisplay(disp);
-                exit(1);
+        while (XPending(disp)) {
+            XNextEvent(disp, &event);
+            switch (event.type) {
+            case Expose:
+                XCopyPlane(disp, neko, root_win, gc, 0, 0, neko_width, neko_height, 0, 0, 1);
+                break;
+            case ButtonPress:
+                if (event.xbutton.button == Button1) {
+                    XFreeGC(disp, gc);
+                    XDestroyWindow(disp, root_win);
+                    XCloseDisplay(disp);
+                    exit(1);
+                }
+                break;
             }
-            break;
         }
         
     }
