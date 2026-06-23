@@ -55,6 +55,52 @@ struct anim_map maps[] =  {
     {&utogi2, &utogi2_mask, utogi2_bits, utogi2_mask_bits}
 };
 
+typedef enum {
+    IDLE,
+    AWAKE,
+    DOWN,
+    DTOGI,
+    DW_LEFT,
+    DW_RIGHT,
+    JARE,
+    SLEEP,
+    KAKI,
+    LEFT,
+    LTOGI,
+    RIGHT,
+    UP,
+    UPLEFT,
+    UPRIGHT,
+    UTOGI
+} STATE;
+
+static STATE neko_state = IDLE;
+static _Bool anim_start = False;
+
+struct animation {
+    Pixmap *xmp;
+    Pixmap *mask;
+};
+
+struct animation move_states[][2] = {
+    {{&mati2, &mati2_mask}, {&mati2, &mati2_mask}}, 
+    {{&awake, &awake_mask}, {&awake, &awake_mask}},
+    {{&down1, &down1_mask}, {&down2, &down2_mask}},
+    {{&dtogi1, &dtogi1_mask}, {&dtogi2, &dtogi2_mask}},
+    {{&dwleft1, &dwleft1_mask}, {&dwleft2, &dwleft2_mask}},
+    {{&dwright1, &dwright1_mask}, {&dwright2, &dwright2_mask}},
+    {{&jare2, &jare2_mask}, {&mati2, &mati2_mask}},
+    {{&sleep1, &sleep1_mask}, {&sleep2, &sleep2_mask}},
+    {{&kaki1, &kaki1_mask}, {&kaki2, &kaki2_mask}},
+    {{&left1, &left1_mask}, {&left2, &left2_mask}},
+    {{&ltogi1, &ltogi1_mask}, {&ltogi2, &ltogi2_mask}},
+    {{&right1, &right1_mask}, {&right2, &right2_mask}},
+    {{&up1, &up1_mask}, {&up2, &up2_mask}},
+    {{&upleft1, &upleft1_mask}, {&upleft2, &upleft2_mask}},
+    {{&upright1, &upright1_mask}, {&upright2, &upright2_mask}},
+    {{&utogi1, &utogi1_mask}, {&utogi2, &utogi2_mask}}
+};
+
 
 void init_anim_map(Display *disp) {
     int screen = DefaultScreen(disp);
@@ -74,7 +120,6 @@ void init_anim_map(Display *disp) {
         );
     }
 }
-
 
 Window create_win(Display *disp) {
     int screen;
@@ -155,6 +200,13 @@ Pixmap initial_draw(Display *disp, Window win) {
     return init_neko;
 }
 
+void neko_animate(Display *disp, Window win, GC gc) {
+    XShapeCombineMask(disp, win, ShapeBounding, 0, 0, *(move_states[neko_state][(int)anim_start].mask), ShapeSet);
+    XCopyPlane(disp, *(move_states[neko_state][(int)anim_start].xmp), win, gc, 0, 0, neko_width, neko_height, 0, 0, 1);
+
+    anim_start = !anim_start;
+}
+
 void sleep_idle_init(Display *disp, Window win) {
     int screen = DefaultScreen(disp);
     sleep1 = XCreatePixmapFromBitmapData(
@@ -186,7 +238,7 @@ void sleep_idle_anim(Display *disp, Window win, GC gc, _Bool which) {
 
     if (!which) {
         XShapeCombineMask(disp, win, ShapeBounding, 0, 0, sleep1_mask, ShapeSet);
-        XMapWindow(disp, win);
+        // XMapWindow(disp, win);
 
         XCopyPlane(disp, sleep1, win, gc, 0, 0, neko_width, neko_height, 0, 0, 1);
     }
@@ -194,7 +246,7 @@ void sleep_idle_anim(Display *disp, Window win, GC gc, _Bool which) {
         
         XShapeCombineMask(disp, win, ShapeBounding, 0, 0, sleep2_mask, ShapeSet);
         XCopyPlane(disp, sleep2, win, gc, 0, 0, neko_width, neko_height, 0, 0, 1);
-        XMapWindow(disp, win);
+        // XMapWindow(disp, win);
     }
 
 }
@@ -227,6 +279,8 @@ void neko_move(Display *disp, Window win) {
 
 }
 
+
+
 int main() {
     Display *disp;
     Window root_win;
@@ -241,25 +295,27 @@ int main() {
 
     gc = create_gc(disp, root_win);
     // Pixmap neko = initial_draw(disp, root_win);
-    GC sleep1_gc, sleep2_gc;
-    _Bool which = False;
+    // GC sleep1_gc, sleep2_gc;
+    // _Bool which = False;
 
     init_anim_map(disp);
-    
+    neko_animate(disp, root_win, gc);
     // sleep_idle_init(disp, root_win);
-    sleep_idle_anim(disp, root_win, gc, which);
+    XMapWindow(disp, root_win);
+
     struct timespec tim, tim2;
     tim.tv_sec = 0;
     tim.tv_nsec = 500000000;
-
+    neko_state = KAKI;
+    anim_start = False;
     
     XEvent event;
     // XCopyPlane(disp, neko, root_win, gc, 0, 0, neko_width, neko_height, 0, 0, 1);
     for ( ;; ) {
         neko_move(disp, root_win);
-        sleep_idle_anim(disp, root_win, gc, which);
+        // sleep_idle_anim(disp, root_win, gc, which);
+        neko_animate(disp, root_win, gc);
 
-        which = !which;
         nanosleep(&tim, &tim2);
 
         while (XPending(disp)) {
@@ -267,7 +323,7 @@ int main() {
             switch (event.type) {
             case Expose:
 
-                break;
+            break;
             case ButtonPress:
                 if (event.xbutton.button == Button1) {
                     XFreeGC(disp, gc);
