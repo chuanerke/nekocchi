@@ -24,7 +24,29 @@ Pixmap upleft1_mask, upleft2_mask, upright1_mask, upright2_mask;
 Pixmap utogi1_mask, utogi2_mask;
 Pixmap space_mask;
 
+//　I don't think there's a need for multiple GCs for each bitmap
+// If I add the different charas then they'll have different properties but for now
+// I think one GC is fine.
 
+
+struct anim_map {
+    Pixmap *xmp;
+    Pixmap *mask;
+    char *xmp_bits;
+    char *mask_bits;
+};
+
+struct anim_map maps[] =  {
+    {&awake, &awake_mask, awake_bits, awake_mask_bits}, {&down1, &down1_mask, down1_bits, down1_mask_bits}, {&down2, &down2_mask, down2_bits, down2_mask_bits},
+    {&dtogi1, &dtogi1_mask, dtogi1_bits, dtogi1_mask_bits}, {&dtogi2, &dtogi2_mask, dtogi2_bits, dtogi2_mask_bits}, {&dwleft1, &dwleft1_mask, dwleft1_bits, dwleft1_mask_bits},
+    {&dwleft2, &dwleft2_mask, dwleft2_bits, dwleft2_mask_bits}, {&dwright1, &dwright1_mask, dwright1_bits, dwright1_mask_bits}, {&dwright2, &dwright2_mask, dwright2_bits, dwright2_mask_bits},
+    {&jare2, &jare2_mask, jare2_bits, jare2_mask_bits}, {&kaki1, &kaki1_mask, kaki1_bits, kaki1_mask_bits}, {&kaki2, &kaki2_mask, kaki2_bits, kaki2_mask_bits}, {&left1, &left1_mask, left1_bits, left1_mask_bits},
+    {&left2, &left2_mask, left2_bits, left2_mask_bits}, {&ltogi1, &ltogi1_mask, ltogi1_bits, ltogi1_mask_bits}, {&ltogi2, &ltogi2_mask, ltogi2_bits, ltogi2_mask_bits}, {&mati2, &mati2_mask, mati2_bits, mati2_mask_bits},
+    {&mati3, &mati3_mask, mati3_bits, mati3_mask_bits}, {&right1, &right1_mask, right1_bits, right1_mask_bits}, {&right2, &right2_mask, right2_bits, right2_mask_bits}, {&rtogi1, &rtogi1_mask, rtogi1_bits, rtogi1_mask_bits},
+    {&rtogi2, &rtogi2_mask, rtogi2_bits, rtogi2_mask_bits}, {&sleep1, &sleep1_mask, sleep1_bits, sleep1_mask_bits}, {&sleep2, &sleep2_mask, sleep2_bits, sleep2_mask_bits}, {&up1, &up1_mask, up1_bits, up1_mask_bits},
+    {&up2, &up2_mask, up2_bits, up2_mask_bits}, {&upleft1, &upleft1_mask, upleft1_bits, upleft1_mask_bits}, {&upleft2, &upleft2_mask, upleft2_bits, upleft2_mask_bits}, {&upright2, &upright2_mask, upright2_bits, upright2_mask_bits},
+    {&utogi1, &utogi1_mask, utogi1_bits, utogi1_mask_bits}, {&utogi2, &utogi2_mask, utogi2_bits, utogi2_mask_bits}
+};
 
 
 Window create_win(Display *disp) {
@@ -106,7 +128,7 @@ Pixmap initial_draw(Display *disp, Window win) {
     return init_neko;
 }
 
-void sleep_idle_init(Display *disp, Window win, GC *sleep1_gc, GC *sleep2_gc) {
+void sleep_idle_init(Display *disp, Window win) {
     int screen = DefaultScreen(disp);
     sleep1 = XCreatePixmapFromBitmapData(
         disp, RootWindow(disp, screen), sleep1_bits, sleep1_width, sleep1_height, 
@@ -114,7 +136,6 @@ void sleep_idle_init(Display *disp, Window win, GC *sleep1_gc, GC *sleep2_gc) {
         NEKO_DEPTH
     );
 
-    *sleep1_gc = create_gc(disp, win);
     sleep1_mask = XCreatePixmapFromBitmapData(
         disp, RootWindow(disp, screen), sleep1_mask_bits, sleep1_mask_width, sleep1_mask_height, 
         WhitePixel(disp, screen), BlackPixel(disp, screen), 
@@ -127,7 +148,6 @@ void sleep_idle_init(Display *disp, Window win, GC *sleep1_gc, GC *sleep2_gc) {
         NEKO_DEPTH
     );
     
-    *sleep2_gc = create_gc(disp, win);
     sleep2_mask = XCreatePixmapFromBitmapData(
         disp, RootWindow(disp, screen), sleep2_mask_bits, sleep2_mask_width, sleep2_mask_height, 
         WhitePixel(disp, screen), BlackPixel(disp, screen), 
@@ -135,21 +155,20 @@ void sleep_idle_init(Display *disp, Window win, GC *sleep1_gc, GC *sleep2_gc) {
     );
 }
 
-void sleep_idle_anim(Display *disp, Window win, GC sleep1_gc, GC sleep2_gc, _Bool which) {
+void sleep_idle_anim(Display *disp, Window win, GC gc, _Bool which) {
 
     if (!which) {
         XShapeCombineMask(disp, win, ShapeBounding, 0, 0, sleep1_mask, ShapeSet);
         XMapWindow(disp, win);
 
-        XCopyPlane(disp, sleep1, win, sleep1_gc, 0, 0, neko_width, neko_height, 0, 0, 1);
+        XCopyPlane(disp, sleep1, win, gc, 0, 0, neko_width, neko_height, 0, 0, 1);
     }
     else {
         
         XShapeCombineMask(disp, win, ShapeBounding, 0, 0, sleep2_mask, ShapeSet);
-        XCopyPlane(disp, sleep2, win, sleep2_gc, 0, 0, neko_width, neko_height, 0, 0, 1);
+        XCopyPlane(disp, sleep2, win, gc, 0, 0, neko_width, neko_height, 0, 0, 1);
         XMapWindow(disp, win);
     }
-
 
 }
 
@@ -198,8 +217,9 @@ int main() {
     GC sleep1_gc, sleep2_gc;
     _Bool which = False;
 
-    sleep_idle_init(disp, root_win, &sleep1_gc, &sleep2_gc);
-    sleep_idle_anim(disp, root_win, sleep1_gc, sleep2_gc, which);
+    
+    sleep_idle_init(disp, root_win);
+    sleep_idle_anim(disp, root_win, gc, which);
     struct timespec tim, tim2;
     tim.tv_sec = 0;
     tim.tv_nsec = 500000000;
@@ -209,7 +229,7 @@ int main() {
     // XCopyPlane(disp, neko, root_win, gc, 0, 0, neko_width, neko_height, 0, 0, 1);
     for ( ;; ) {
         neko_move(disp, root_win);
-        sleep_idle_anim(disp, root_win, sleep1_gc, sleep2_gc, which);
+        sleep_idle_anim(disp, root_win, gc, which);
 
         which = !which;
         nanosleep(&tim, &tim2);
