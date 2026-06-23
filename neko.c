@@ -28,7 +28,6 @@ Pixmap space_mask;
 // If I add the different charas then they'll have different properties but for now
 // I think one GC is fine.
 
-
 struct anim_map {
     Pixmap *xmp;
     Pixmap *mask;
@@ -125,7 +124,7 @@ Window create_win(Display *disp) {
     int screen;
     screen = DefaultScreen(disp);
     Window temp_win;
-    
+
     w_depth = DefaultDepth(disp, screen);
 
     uint32_t value_mask;
@@ -273,13 +272,10 @@ void neko_move(Display *disp, Window win) {
     if ((win_x > neko_width || win_x < 0) || (win_y > neko_width || win_y < 0)) {
         printf("%d\n", win_x);
     }
-
     // printf("X: %d, Y: %d\n", win_x, win_y);
     // printf("NX: %d, NY: %d\n", neko_x, neko_y);
 
 }
-
-
 
 int main() {
     Display *disp;
@@ -294,13 +290,9 @@ int main() {
     set_hints(disp, root_win);
 
     gc = create_gc(disp, root_win);
-    // Pixmap neko = initial_draw(disp, root_win);
-    // GC sleep1_gc, sleep2_gc;
-    // _Bool which = False;
 
     init_anim_map(disp);
     neko_animate(disp, root_win, gc);
-    // sleep_idle_init(disp, root_win);
     XMapWindow(disp, root_win);
 
     struct timespec tim, tim2;
@@ -310,7 +302,6 @@ int main() {
     anim_start = False;
     
     XEvent event;
-    // XCopyPlane(disp, neko, root_win, gc, 0, 0, neko_width, neko_height, 0, 0, 1);
     for ( ;; ) {
         neko_move(disp, root_win);
         // sleep_idle_anim(disp, root_win, gc, which);
@@ -322,8 +313,7 @@ int main() {
             XNextEvent(disp, &event);
             switch (event.type) {
             case Expose:
-
-            break;
+                break;
             case ButtonPress:
                 if (event.xbutton.button == Button1) {
                     XFreeGC(disp, gc);
