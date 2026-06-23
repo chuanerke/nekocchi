@@ -42,6 +42,8 @@ static char awake_mask_bits[] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
+#define NEKO_DEPTH 1
+
 static int w_depth;
 
 Window create_win(Display *disp) {
@@ -60,8 +62,15 @@ Window create_win(Display *disp) {
     value_mask = CWBackPixel | CWEventMask | CWOverrideRedirect;
     attr.background_pixel = BlackPixel(disp, screen);
 
+    // unsigned int root_width, root_height;
+    // XGetGeometry(disp, RootWindow(disp, screen), NULL, NULL, NULL, &root_width, &root_height, NULL, NULL);
+
+    unsigned int win_x, win_y;
+    win_x = (DisplayWidth(disp, screen) - (neko_width / 2)) / 2;
+    win_y = (DisplayHeight(disp, screen) - (neko_height / 2)) / 2;
+
     temp_win = XCreateWindow(
-        disp, RootWindow(disp, screen), 0, 0, neko_width, neko_height, 0, 
+        disp, RootWindow(disp, screen), win_x, win_y, neko_width, neko_height, 0, 
         w_depth, InputOutput, CopyFromParent, 
         value_mask, &attr
     );
@@ -105,14 +114,13 @@ Pixmap initial_draw(Display *disp, Window win) {
     Pixmap init_neko = XCreatePixmapFromBitmapData(
         disp, RootWindow(disp, screen), neko_bits, neko_width, neko_height, 
         BlackPixel(disp, screen), WhitePixel(disp, screen), 
-        1
+        NEKO_DEPTH
     );
 
-    // IMPORTANT : IF DEPTH NOT AT 1 IT WILL NOT WORK, I WILL SEE WHY LATER
     Pixmap neko_mask = XCreatePixmapFromBitmapData(
         disp, RootWindow(disp, screen), awake_mask_bits, awake_mask_width, awake_mask_height, 
         WhitePixel(disp, screen), BlackPixel(disp, screen), 
-        1
+        NEKO_DEPTH
     );
 
     XShapeCombineMask(disp, win, ShapeBounding, 0, 0, neko_mask, ShapeSet);
@@ -120,6 +128,8 @@ Pixmap initial_draw(Display *disp, Window win) {
 
     return init_neko;
 }
+
+
 
 void move_neko(Display *disp, Window win, int x, int y) {
     int err = XMoveWindow(disp, win, x, y); 
@@ -144,13 +154,14 @@ int main() {
     XEvent event;
     int x = 0;
     int y = 0;
+    printf("%d\n", w_depth);
 
-    XCopyPlane(disp, neko, root_win, gc, 0, 0, neko_width, neko_height, 0, 0, 1);
+    // XCopyPlane(disp, neko, root_win, gc, 0, 0, neko_width, neko_height, 0, 0, 1);
 
     for ( ;; ) {
         XNextEvent(disp, &event);
-        move_neko(disp, root_win, ++x, ++y);
-        sleep(1);
+        // move_neko(disp, root_win, ++x, ++y);
+        // sleep(1);
 
         switch (event.type) {
         case Expose:
