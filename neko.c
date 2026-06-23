@@ -37,16 +37,43 @@ struct anim_map {
 };
 
 struct anim_map maps[] =  {
-    {&awake, &awake_mask, awake_bits, awake_mask_bits}, {&down1, &down1_mask, down1_bits, down1_mask_bits}, {&down2, &down2_mask, down2_bits, down2_mask_bits},
-    {&dtogi1, &dtogi1_mask, dtogi1_bits, dtogi1_mask_bits}, {&dtogi2, &dtogi2_mask, dtogi2_bits, dtogi2_mask_bits}, {&dwleft1, &dwleft1_mask, dwleft1_bits, dwleft1_mask_bits},
-    {&dwleft2, &dwleft2_mask, dwleft2_bits, dwleft2_mask_bits}, {&dwright1, &dwright1_mask, dwright1_bits, dwright1_mask_bits}, {&dwright2, &dwright2_mask, dwright2_bits, dwright2_mask_bits},
-    {&jare2, &jare2_mask, jare2_bits, jare2_mask_bits}, {&kaki1, &kaki1_mask, kaki1_bits, kaki1_mask_bits}, {&kaki2, &kaki2_mask, kaki2_bits, kaki2_mask_bits}, {&left1, &left1_mask, left1_bits, left1_mask_bits},
-    {&left2, &left2_mask, left2_bits, left2_mask_bits}, {&ltogi1, &ltogi1_mask, ltogi1_bits, ltogi1_mask_bits}, {&ltogi2, &ltogi2_mask, ltogi2_bits, ltogi2_mask_bits}, {&mati2, &mati2_mask, mati2_bits, mati2_mask_bits},
-    {&mati3, &mati3_mask, mati3_bits, mati3_mask_bits}, {&right1, &right1_mask, right1_bits, right1_mask_bits}, {&right2, &right2_mask, right2_bits, right2_mask_bits}, {&rtogi1, &rtogi1_mask, rtogi1_bits, rtogi1_mask_bits},
-    {&rtogi2, &rtogi2_mask, rtogi2_bits, rtogi2_mask_bits}, {&sleep1, &sleep1_mask, sleep1_bits, sleep1_mask_bits}, {&sleep2, &sleep2_mask, sleep2_bits, sleep2_mask_bits}, {&up1, &up1_mask, up1_bits, up1_mask_bits},
-    {&up2, &up2_mask, up2_bits, up2_mask_bits}, {&upleft1, &upleft1_mask, upleft1_bits, upleft1_mask_bits}, {&upleft2, &upleft2_mask, upleft2_bits, upleft2_mask_bits}, {&upright2, &upright2_mask, upright2_bits, upright2_mask_bits},
-    {&utogi1, &utogi1_mask, utogi1_bits, utogi1_mask_bits}, {&utogi2, &utogi2_mask, utogi2_bits, utogi2_mask_bits}
+    {&awake, &awake_mask, awake_bits, awake_mask_bits}, {&down1, &down1_mask, down1_bits, down1_mask_bits}, 
+    {&down2, &down2_mask, down2_bits, down2_mask_bits}, {&dtogi1, &dtogi1_mask, dtogi1_bits, dtogi1_mask_bits}, 
+    {&dtogi2, &dtogi2_mask, dtogi2_bits, dtogi2_mask_bits}, {&dwleft1, &dwleft1_mask, dwleft1_bits, dwleft1_mask_bits},
+    {&dwleft2, &dwleft2_mask, dwleft2_bits, dwleft2_mask_bits}, {&dwright1, &dwright1_mask, dwright1_bits, dwright1_mask_bits}, 
+    {&dwright2, &dwright2_mask, dwright2_bits, dwright2_mask_bits}, {&jare2, &jare2_mask, jare2_bits, jare2_mask_bits}, 
+    {&kaki1, &kaki1_mask, kaki1_bits, kaki1_mask_bits}, {&kaki2, &kaki2_mask, kaki2_bits, kaki2_mask_bits}, 
+    {&left1, &left1_mask, left1_bits, left1_mask_bits}, {&left2, &left2_mask, left2_bits, left2_mask_bits}, 
+    {&ltogi1, &ltogi1_mask, ltogi1_bits, ltogi1_mask_bits}, {&ltogi2, &ltogi2_mask, ltogi2_bits, ltogi2_mask_bits}, 
+    {&mati2, &mati2_mask, mati2_bits, mati2_mask_bits}, {&mati3, &mati3_mask, mati3_bits, mati3_mask_bits}, 
+    {&right1, &right1_mask, right1_bits, right1_mask_bits}, {&right2, &right2_mask, right2_bits, right2_mask_bits}, 
+    {&rtogi1, &rtogi1_mask, rtogi1_bits, rtogi1_mask_bits}, {&rtogi2, &rtogi2_mask, rtogi2_bits, rtogi2_mask_bits}, 
+    {&sleep1, &sleep1_mask, sleep1_bits, sleep1_mask_bits}, {&sleep2, &sleep2_mask, sleep2_bits, sleep2_mask_bits}, 
+    {&up1, &up1_mask, up1_bits, up1_mask_bits}, {&up2, &up2_mask, up2_bits, up2_mask_bits}, 
+    {&upleft1, &upleft1_mask, upleft1_bits, upleft1_mask_bits}, {&upleft2, &upleft2_mask, upleft2_bits, upleft2_mask_bits}, 
+    {&upright2, &upright2_mask, upright2_bits, upright2_mask_bits}, {&utogi1, &utogi1_mask, utogi1_bits, utogi1_mask_bits}, 
+    {&utogi2, &utogi2_mask, utogi2_bits, utogi2_mask_bits}
 };
+
+
+void init_anim_map(Display *disp) {
+    int screen = DefaultScreen(disp);
+
+    size_t len = sizeof(maps) / sizeof(maps[0]);
+    for (size_t i = 0; i < len; i++) {
+        *(maps[i].xmp) = XCreatePixmapFromBitmapData(
+            disp, RootWindow(disp, screen), maps[i].xmp_bits, neko_width, neko_height, 
+            BlackPixel(disp, screen), WhitePixel(disp, screen), 
+            NEKO_DEPTH
+        );
+    
+        *(maps[i].mask) = XCreatePixmapFromBitmapData(
+            disp, RootWindow(disp, screen), maps[i].mask_bits, neko_width, neko_height, 
+            WhitePixel(disp, screen), BlackPixel(disp, screen), 
+            NEKO_DEPTH
+        );
+    }
+}
 
 
 Window create_win(Display *disp) {
@@ -213,12 +240,13 @@ int main() {
     set_hints(disp, root_win);
 
     gc = create_gc(disp, root_win);
-    Pixmap neko = initial_draw(disp, root_win);
+    // Pixmap neko = initial_draw(disp, root_win);
     GC sleep1_gc, sleep2_gc;
     _Bool which = False;
 
+    init_anim_map(disp);
     
-    sleep_idle_init(disp, root_win);
+    // sleep_idle_init(disp, root_win);
     sleep_idle_anim(disp, root_win, gc, which);
     struct timespec tim, tim2;
     tim.tv_sec = 0;
