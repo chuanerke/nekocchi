@@ -73,8 +73,11 @@ typedef enum {
     UTOGI
 } STATE;
 
+
+
 static STATE neko_state = IDLE;
 static _Bool anim_start = False;
+static _Bool neko_still = True;
 
 struct animation {
     Pixmap *xmp;
@@ -152,7 +155,6 @@ Window create_win(Display *disp) {
 }
 
 void set_hints(Display *disp, Window win) {
-    
     XWMHints *wm_hints = XAllocWMHints();
     XSizeHints *wm_size = XAllocSizeHints();
 
@@ -269,13 +271,37 @@ void neko_move(Display *disp, Window win) {
 
     XGetGeometry(disp, win, &root_ret, &neko_x, &neko_y, &width_ret, &height_ret, &border_width_ret, &dept_ret);
 
-    if ((win_x > neko_width || win_x < 0) || (win_y > neko_width || win_y < 0)) {
-        printf("%d\n", win_x);
-    }
+    double angle = atan2(win_y, win_x);
+    double deg_angle = angle / M_PI * 180;
+
+    double x_mov = cosl(angle);
+    double y_mov = sinl(angle);
+
+    double distance = sqrt((win_x * win_x) + (win_y * win_y));
+
+    printf("DA = %f, DX = %f, DY = %f, distance = %f\n", deg_angle, x_mov, y_mov, distance);
+
+    // if ((win_x > neko_width || win_x < 0) || (win_y > neko_width || win_y < 0)) {
+    //     neko_still = False;
+    // }
     // printf("X: %d, Y: %d\n", win_x, win_y);
     // printf("NX: %d, NY: %d\n", neko_x, neko_y);
-
 }
+
+
+// void neko_angle(double x_mov, double y_mov) {
+//     if (y_mov ) {
+//         if (x_mov )
+//     } 
+// }
+
+
+void change_state() {
+    if (!neko_still && (neko_state == IDLE || neko_state == KAKI || neko_state == JARE || neko_state == SLEEP)) {
+        neko_state = AWAKE;
+    }
+}
+
 
 int main() {
     Display *disp;
@@ -294,6 +320,7 @@ int main() {
     init_anim_map(disp);
     neko_animate(disp, root_win, gc);
     XMapWindow(disp, root_win);
+
 
     struct timespec tim, tim2;
     tim.tv_sec = 0;
