@@ -1,6 +1,7 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/Xos.h>
+#include <X11/extensions/shape.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -9,215 +10,162 @@
 #include <string.h>
 #include <unistd.h>
 
-#define neko_width 33
-#define neko_height 33
-static unsigned char neko_bits[] = {
-    0xff,0xff,0xff,0xff,0x01,0xff,0xff,0xff,0xff,0x01,0xff,0xff,0xff,0xff,0x01,
-    0xff,0xff,0xff,0xff,0x01,0xff,0xef,0xef,0xff,0x01,0xff,0xcf,0xe7,0xff,0x01,
-    0xff,0xc7,0xc7,0xff,0x01,0xff,0x87,0xc3,0xff,0x01,0xff,0x83,0x83,0xff,0x01,
-    0xff,0x03,0x80,0xff,0x01,0xff,0x23,0x88,0xff,0x01,0xff,0x23,0x88,0xff,0x01,
-    0xff,0x23,0x88,0xff,0x01,0xff,0x03,0x80,0xff,0x01,0xff,0x3b,0xb9,0xff,0x01,
-    0xff,0x07,0xc0,0xff,0x01,0xff,0x0f,0xe0,0xff,0x01,0xff,0x7f,0xfc,0xff,0x01,
-    0xff,0x7f,0xfc,0xff,0x01,0xff,0x3f,0xf8,0xff,0x01,0xff,0x1f,0xf0,0xff,0x01,
-    0xff,0x0f,0xe0,0xff,0x01,0xff,0x0f,0xe0,0xff,0x01,0xff,0x0c,0x61,0xfe,0x01,
-    0x7f,0x18,0x31,0xfc,0x01,0x7f,0x10,0x11,0xfc,0x01,0xff,0x11,0x11,0xff,0x01,
-    0x7f,0x90,0x13,0x8c,0x01,0xff,0xff,0xff,0xff,0x01,0xff,0xff,0xff,0xff,0x01,
-    0xff,0xff,0xff,0xff,0x01,0xff,0xff,0xff,0xff,0x01,0xff,0xff,0xff,0xff,0x01 
+#define neko_width 32
+#define neko_height 32
+static char neko_bits[] = {
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x04,
+    0x40, 0x10, 0x10, 0x02, 0x80, 0x28, 0x28, 0x01, 0x00, 0x49, 0x24, 0x00,
+    0x06, 0x44, 0x44, 0x60, 0x18, 0x84, 0x42, 0x18, 0x60, 0x82, 0x83, 0x06,
+    0x00, 0x02, 0x80, 0x00, 0x00, 0x22, 0x88, 0x00, 0x0f, 0x22, 0x88, 0x78,
+    0x00, 0x22, 0x88, 0x00, 0x00, 0x02, 0x80, 0x00, 0x00, 0x3a, 0xb9, 0x00,
+    0x00, 0x04, 0x40, 0x00, 0x00, 0x08, 0x20, 0x00, 0x00, 0x70, 0x1c, 0x02,
+    0x00, 0x40, 0x04, 0x05, 0x00, 0x20, 0x88, 0x04, 0x00, 0x10, 0x50, 0x02,
+    0x00, 0x08, 0x20, 0x01, 0x00, 0x0b, 0xa0, 0x01, 0x80, 0x0c, 0x61, 0x02,
+    0x40, 0x18, 0x31, 0x04, 0x40, 0x10, 0x11, 0x04, 0xc0, 0x11, 0x11, 0x07,
+    0x60, 0x90, 0x13, 0x0c, 0xe0, 0xff, 0xfe, 0x0f, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
-#define petal_cursor_width 9
-#define petal_cursor_height 14
-#define petal_cursor_x_hot 4
-#define petal_cursor_y_hot 12
-static unsigned char petal_cursor_bits[] = {
-   0x00, 0x00, 0x6c, 0x00, 0xfe, 0x00, 0xfe, 0x00, 0xfe, 0x00, 0xfe, 0x00,
-   0x7c, 0x00, 0x7c, 0x00, 0x7c, 0x00, 0x38, 0x00, 0x38, 0x00, 0x10, 0x00,
-   0x10, 0x00, 0x00, 0x00};
+#define awake_mask_width 32
+#define awake_mask_height 32
+static char awake_mask_bits[] = {
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x04,
+    0x40, 0x10, 0x10, 0x02, 0x80, 0x38, 0x38, 0x01, 0x00, 0x79, 0x3c, 0x00,
+    0x06, 0x7c, 0x7c, 0x60, 0x18, 0xfc, 0x7e, 0x18, 0x60, 0xfe, 0xff, 0x06,
+    0x00, 0xfe, 0xff, 0x00, 0x00, 0xfe, 0xff, 0x00, 0x0f, 0xfe, 0xff, 0x78,
+    0x00, 0xfe, 0xff, 0x00, 0x00, 0xfe, 0xff, 0x00, 0x00, 0xfe, 0xff, 0x00,
+    0x00, 0xfc, 0x7f, 0x00, 0x00, 0xf8, 0x3f, 0x00, 0x00, 0xf0, 0x1f, 0x02,
+    0x00, 0xc0, 0x07, 0x07, 0x00, 0xe0, 0x8f, 0x07, 0x00, 0xf0, 0xdf, 0x03,
+    0x00, 0xf8, 0xff, 0x01, 0x00, 0xfb, 0xff, 0x01, 0x80, 0xff, 0xff, 0x03,
+    0xc0, 0xff, 0xff, 0x07, 0xc0, 0xff, 0xff, 0x07, 0xc0, 0xff, 0xff, 0x07,
+    0xe0, 0xff, 0xff, 0x0f, 0xe0, 0xff, 0xfe, 0x0f, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+};
 
-#define petal_cursor_mask_width 9
-#define petal_cursor_mask_height 14
-#define petal_cursor_mask_hot 0
-static unsigned char petal_cursor_mask_bits[] = {
-   0x6c, 0x00, 0xfe, 0x00, 0xff, 0x01, 0xff, 0x01, 0xff, 0x01, 0xff, 0x01,
-   0xfe, 0x00, 0xfe, 0x00, 0xfe, 0x00, 0x7c, 0x00, 0x7c, 0x00, 0x38, 0x00,
-   0x38, 0x00, 0x10, 0x00};
+static int w_depth;
 
-
-#define S_WIDTH 600
-#define S_HEIGHT 340
-#define B_WIDTH 5
-
-// #define WIN_NAME "Shinon"
-// #define ICON_NAME "Sh"
-
-static Display *disp;
-static int screen;
-static Window win;
-static Window w_win, b_win;  
-static GC gc;
-static XSetWindowAttributes attr;
-static XSetWindowAttributes w_att, b_att;
-static XWindowChanges alter;
-static XSizeHints wmsize;
-static XWMHints wmhints;
-static XTextProperty x_win_name, x_icon_name;
-static uint32_t value_mask;
-
-static Pixmap neko_map;
-static Pixmap b_arr, f_arr;
-static Cursor cursor;
-
-static XColor exact, closest, front, backing;
-
-static char *win_name = "Shinon";
-static char *icon_name = "Sh";
-
-
-uint32_t black, white;
-
-void init_x() {
-    disp = XOpenDisplay((char *)0);
-    screen = DefaultScreen(disp);   
-
-
-    black = BlackPixel(disp, screen);
-    white = WhitePixel(disp, screen);
-
-    // attr.background_pixel = WhitePixel(disp, screen);
-    attr.border_pixel = BlackPixel(disp, screen);
+Window create_win(Display *disp) {
+    int screen;
+    screen = DefaultScreen(disp);
+    Window temp_win;
     
-    XAllocNamedColor(disp, XDefaultColormap(disp, screen), "red", &exact, &closest);
-    attr.background_pixel = closest.pixel;
-    attr.event_mask = ExposureMask | ButtonPressMask | KeyPressMask | StructureNotifyMask;
-    value_mask = CWBackPixel | CWBorderPixel | CWEventMask;
+    w_depth = DefaultDepth(disp, screen);
 
+    uint32_t value_mask;
+    XSetWindowAttributes attr;
 
-    // win = XCreateSimpleWindow(disp, DefaultRootWindow(disp), 0, 0, S_WIDTH, S_HEIGHT, B_WIDTH, white, black);
-    win = XCreateWindow(
-        disp, RootWindow(disp, screen), 200, 200, S_WIDTH, S_HEIGHT, 
-        B_WIDTH, DefaultDepth(disp, screen), InputOutput, DefaultVisual(disp, screen),
+    attr.event_mask = ExposureMask | ButtonPressMask | StructureNotifyMask;
+    attr.override_redirect = True;
+
+    value_mask = CWBackPixel | CWEventMask | CWOverrideRedirect;
+    attr.background_pixel = BlackPixel(disp, screen);
+
+    temp_win = XCreateWindow(
+        disp, RootWindow(disp, screen), 0, 0, neko_width, neko_height, 0, 
+        w_depth, InputOutput, CopyFromParent, 
         value_mask, &attr
     );
 
-    wmsize.flags = USPosition | USSize;
-    XSetWMNormalHints(disp, win, &wmsize);
-    wmhints.initial_state = NormalState;
-    wmhints.flags = StateHint;
-    XSetWMHints(disp, win, &wmhints);
-    XStringListToTextProperty(&win_name, 1, &x_win_name);
-    XSetWMName(disp, win, &x_win_name);
-    XStringListToTextProperty(&icon_name, 1, &x_icon_name);
-    XSetWMIconName(disp, win, &x_icon_name);
-
-    neko_map = XCreatePixmapFromBitmapData(disp, win, neko_bits, neko_width, neko_height, black, white, DefaultDepth(disp, screen));
-
-    b_arr = XCreatePixmapFromBitmapData(disp, win, petal_cursor_mask_bits, petal_cursor_mask_width, petal_cursor_mask_height, 1, 0, 1);
-    f_arr = XCreatePixmapFromBitmapData(disp, win, petal_cursor_bits, petal_cursor_width, petal_cursor_height, 1, 0, 1);
-
-    // printf("b_arr = %d\n", b_arr);
-
-    XAllocNamedColor(disp, XDefaultColormap(disp, screen), "black", &exact, &front);
-    XAllocNamedColor(disp, XDefaultColormap(disp, screen), "white", &exact, &backing);
-
-    cursor = XCreatePixmapCursor(disp, f_arr, b_arr, &front, &backing, petal_cursor_x_hot, petal_cursor_y_hot);
-
-    XDefineCursor(disp, win, cursor);
-
-    w_att.event_mask = ButtonPressMask | ExposureMask;
-    w_att.background_pixel = WhitePixel(disp, screen);
-
-    b_att.event_mask = ButtonPressMask | ExposureMask;
-    b_att.background_pixel = BlackPixel(disp, screen);
-
-    w_win = XCreateWindow(
-        disp, win, 100, 50, 100, 100, 1, DefaultDepth(disp, screen), 
-        InputOutput, DefaultVisual(disp, screen), value_mask, &w_att
-    );
+    XSelectInput(disp, temp_win, attr.event_mask);
     
-    b_win = XCreateWindow(
-        disp, win, 300, 50, 50, 50, 1, DefaultDepth(disp, screen), 
-        InputOutput, DefaultVisual(disp, screen), value_mask, &b_att
-    );
+    return temp_win;
+}
 
+void set_hints(Display *disp, Window win) {
+    
+    XWMHints *wm_hints = XAllocWMHints();
+    XSizeHints *wm_size = XAllocSizeHints();
+
+    wm_size->flags = USPosition | USSize | PMaxSize;
+    wm_size->max_width = neko_width;
+    wm_size->max_height = neko_height;
+
+    wm_hints->initial_state = NormalState;
+    wm_hints->flags = StateHint;
+
+    XSetWMHints(disp, win, wm_hints);
+    XSetWMNormalHints(disp, win, wm_size);
+
+    XFree(wm_hints);
+    XFree(wm_size);
+}
+
+GC create_gc(Display *disp, Window win) {
+    GC gc;
 
     gc = XCreateGC(disp, win, 0, NULL);
-    XSetForeground(disp, gc, black);
-    XSetBackground(disp, gc, white);
-    // attr.background_pixel = BlackPixel(disp, screen);
+    XSetForeground(disp, gc, BlackPixel(disp, DefaultScreen(disp)));
+    XSetBackground(disp, gc, WhitePixel(disp, DefaultScreen(disp)));
 
-    // rover = XCreateWindow(
-    //     disp, win, 100, 30, 50, 70, 2, DefaultDepth(disp, screen), InputOutput,
-    //     DefaultVisual(disp, screen), value_mask, &attr
-    // );
+    return gc;
+} 
 
-    // value_mask = CWX | CWY;
+Pixmap initial_draw(Display *disp, Window win) {
+    int screen = DefaultScreen(disp);
+    Pixmap init_neko = XCreatePixmapFromBitmapData(
+        disp, RootWindow(disp, screen), neko_bits, neko_width, neko_height, 
+        BlackPixel(disp, screen), WhitePixel(disp, screen), 
+        1
+    );
 
+    // IMPORTANT : IF DEPTH NOT AT 1 IT WILL NOT WORK, I WILL SEE WHY LATER
+    Pixmap neko_mask = XCreatePixmapFromBitmapData(
+        disp, RootWindow(disp, screen), awake_mask_bits, awake_mask_width, awake_mask_height, 
+        WhitePixel(disp, screen), BlackPixel(disp, screen), 
+        1
+    );
+
+    XShapeCombineMask(disp, win, ShapeBounding, 0, 0, neko_mask, ShapeSet);
     XMapWindow(disp, win);
-    XMapWindow(disp, w_win);
-    XMapWindow(disp, b_win);
+
+    return init_neko;
 }
 
-void close_x() {
-    XFreeGC(disp, gc);
-    XDestroyWindow(disp, w_win);
-
-    XDestroyWindow(disp, b_win);
-    XDestroyWindow(disp, win);
-
-
-    XCloseDisplay(disp);
-
-    exit(1);
+void move_neko(Display *disp, Window win, int x, int y) {
+    int err = XMoveWindow(disp, win, x, y); 
 }
+
 
 int main() {
+    Display *disp;
+    Window root_win;
+    int screen;
+    GC gc;
 
-    init_x();
+    disp = XOpenDisplay((char *)0);
+    screen = DefaultScreen(disp);
+    root_win = create_win(disp);
+
+    set_hints(disp, root_win);
+
+    gc = create_gc(disp, root_win);
+    Pixmap neko = initial_draw(disp, root_win);
 
     XEvent event;
-    KeySym key;
-    
-    int x, y;
-    char text[255];
-    while (1) {
+    int x = 0;
+    int y = 0;
+
+    XCopyPlane(disp, neko, root_win, gc, 0, 0, neko_width, neko_height, 0, 0, 1);
+
+    for ( ;; ) {
         XNextEvent(disp, &event);
-        
+        move_neko(disp, root_win, ++x, ++y);
+        sleep(1);
+
         switch (event.type) {
         case Expose:
+            XCopyPlane(disp, neko, root_win, gc, 0, 0, neko_width, neko_height, 0, 0, 1);
             break;
-        
-        // case ButtonPress:
-        //     if (event.xbutton.button == Button1) {
-        //         x = event.xbutton.x;
-        //         y = event.xbutton.y;
-        //         XCopyPlane(disp, neko_map, win, gc, 0, 0, neko_width, neko_height, x, y, 1);
-        //     }
-        //     break;
-        
-        case KeyPress:
-            if (XLookupString(&event.xkey, text, 255, &key, 0) == 1) {
-                if (text[0] == 'q') {
-                    close_x();
-                }
+        case ButtonPress:
+            if (event.xbutton.button == Button1) {
+                XFreeGC(disp, gc);
+                XDestroyWindow(disp, root_win);
+                XCloseDisplay(disp);
+                exit(1);
             }
+            break;
         }
         
-        // if (event.type == Expose && event.xexpose.count == 0) {
-
-
-        // // }
-        // if (event.type == ConfigureNotify) {
-        //     XMapWindow(disp, rover);
-        //     sleep(1);
-        //     x += 5;
-        //     y += 6;
-        // }
-        // if (event.type == KeyPress && XLookupString(&event.xkey, text, 255, &key, 0) == 1) {
-        //     if (text[0] == 'q') {
-        //         close_x();
-        //     }
-        //     printf("%c\n", text[0]);
-        // }
     }
 
     return 0;
