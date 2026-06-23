@@ -1,50 +1,31 @@
-#include <X11/Xlib.h>
-#include <X11/Xutil.h>
-#include <X11/Xos.h>
-#include <X11/extensions/shape.h>
-
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdint.h>
-#include <error.h>
-#include <string.h>
-#include <unistd.h>
+#include "neko.h"
 
 #define neko_width 32
 #define neko_height 32
-static char neko_bits[] = {
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x04,
-    0x40, 0x10, 0x10, 0x02, 0x80, 0x28, 0x28, 0x01, 0x00, 0x49, 0x24, 0x00,
-    0x06, 0x44, 0x44, 0x60, 0x18, 0x84, 0x42, 0x18, 0x60, 0x82, 0x83, 0x06,
-    0x00, 0x02, 0x80, 0x00, 0x00, 0x22, 0x88, 0x00, 0x0f, 0x22, 0x88, 0x78,
-    0x00, 0x22, 0x88, 0x00, 0x00, 0x02, 0x80, 0x00, 0x00, 0x3a, 0xb9, 0x00,
-    0x00, 0x04, 0x40, 0x00, 0x00, 0x08, 0x20, 0x00, 0x00, 0x70, 0x1c, 0x02,
-    0x00, 0x40, 0x04, 0x05, 0x00, 0x20, 0x88, 0x04, 0x00, 0x10, 0x50, 0x02,
-    0x00, 0x08, 0x20, 0x01, 0x00, 0x0b, 0xa0, 0x01, 0x80, 0x0c, 0x61, 0x02,
-    0x40, 0x18, 0x31, 0x04, 0x40, 0x10, 0x11, 0x04, 0xc0, 0x11, 0x11, 0x07,
-    0x60, 0x90, 0x13, 0x0c, 0xe0, 0xff, 0xfe, 0x0f, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-};
-
-#define awake_mask_width 32
-#define awake_mask_height 32
-static char awake_mask_bits[] = {
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x20, 0x00, 0x00, 0x04,
-    0x40, 0x10, 0x10, 0x02, 0x80, 0x38, 0x38, 0x01, 0x00, 0x79, 0x3c, 0x00,
-    0x06, 0x7c, 0x7c, 0x60, 0x18, 0xfc, 0x7e, 0x18, 0x60, 0xfe, 0xff, 0x06,
-    0x00, 0xfe, 0xff, 0x00, 0x00, 0xfe, 0xff, 0x00, 0x0f, 0xfe, 0xff, 0x78,
-    0x00, 0xfe, 0xff, 0x00, 0x00, 0xfe, 0xff, 0x00, 0x00, 0xfe, 0xff, 0x00,
-    0x00, 0xfc, 0x7f, 0x00, 0x00, 0xf8, 0x3f, 0x00, 0x00, 0xf0, 0x1f, 0x02,
-    0x00, 0xc0, 0x07, 0x07, 0x00, 0xe0, 0x8f, 0x07, 0x00, 0xf0, 0xdf, 0x03,
-    0x00, 0xf8, 0xff, 0x01, 0x00, 0xfb, 0xff, 0x01, 0x80, 0xff, 0xff, 0x03,
-    0xc0, 0xff, 0xff, 0x07, 0xc0, 0xff, 0xff, 0x07, 0xc0, 0xff, 0xff, 0x07,
-    0xe0, 0xff, 0xff, 0x0f, 0xe0, 0xff, 0xfe, 0x0f, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
-};
-
-#define NEKO_DEPTH 1
 
 static int w_depth;
+
+Pixmap awake, down1, down2, dtogi1, dtogi2;
+Pixmap dwleft1, dwleft2, dwright1, dwright2;
+Pixmap jare2, kaki1, kaki2, left1, left2;
+Pixmap ltogi1, ltogi2, mati2, mati3;
+Pixmap right1, right2, rtogi1, rtogi2;
+Pixmap sleep1, sleep2, up1, up2;
+Pixmap upleft1, upleft2, upright1, upright2;
+Pixmap utogi1, utogi2;
+
+Pixmap awake_mask, down1_mask, down2_mask, dtogi1_mask, dtogi2_mask;
+Pixmap dwleft1_mask, dwleft2_mask, dwright1_mask, dwright2_mask;
+Pixmap jare2_mask, kaki1_mask, kaki2_mask, left1_mask, left2_mask;
+Pixmap ltogi1_mask, ltogi2_mask, mati2_mask, mati3_mask;
+Pixmap right1_mask, right2_mask, rtogi1_mask, rtogi2_mask;
+Pixmap sleep1_mask, sleep2_mask, up1_mask, up2_mask;
+Pixmap upleft1_mask, upleft2_mask, upright1_mask, upright2_mask;
+Pixmap utogi1_mask, utogi2_mask;
+Pixmap space_mask;
+
+
+
 
 Window create_win(Display *disp) {
     int screen;
@@ -109,7 +90,7 @@ GC create_gc(Display *disp, Window win) {
 Pixmap initial_draw(Display *disp, Window win) {
     int screen = DefaultScreen(disp);
     Pixmap init_neko = XCreatePixmapFromBitmapData(
-        disp, RootWindow(disp, screen), neko_bits, neko_width, neko_height, 
+        disp, RootWindow(disp, screen), awake_bits, awake_width, awake_height, 
         BlackPixel(disp, screen), WhitePixel(disp, screen), 
         NEKO_DEPTH
     );
@@ -121,25 +102,56 @@ Pixmap initial_draw(Display *disp, Window win) {
     );
 
     XShapeCombineMask(disp, win, ShapeBounding, 0, 0, neko_mask, ShapeSet);
-    XMapWindow(disp, win);
 
     return init_neko;
 }
 
+void sleep_idle_init(Display *disp, Window win, GC *sleep1_gc, GC *sleep2_gc) {
+    int screen = DefaultScreen(disp);
+    sleep1 = XCreatePixmapFromBitmapData(
+        disp, RootWindow(disp, screen), sleep1_bits, sleep1_width, sleep1_height, 
+        BlackPixel(disp, screen), WhitePixel(disp, screen), 
+        NEKO_DEPTH
+    );
 
-void move_neko(Display *disp, Window win, int x, int y) {
-    int err = XMoveWindow(disp, win, x, y); 
+    *sleep1_gc = create_gc(disp, win);
+    sleep1_mask = XCreatePixmapFromBitmapData(
+        disp, RootWindow(disp, screen), sleep1_mask_bits, sleep1_mask_width, sleep1_mask_height, 
+        WhitePixel(disp, screen), BlackPixel(disp, screen), 
+        NEKO_DEPTH
+    );
+
+    sleep2 = XCreatePixmapFromBitmapData(
+        disp, RootWindow(disp, screen), sleep2_bits, sleep2_width, sleep2_height, 
+        BlackPixel(disp, screen), WhitePixel(disp, screen), 
+        NEKO_DEPTH
+    );
+    
+    *sleep2_gc = create_gc(disp, win);
+    sleep2_mask = XCreatePixmapFromBitmapData(
+        disp, RootWindow(disp, screen), sleep2_mask_bits, sleep2_mask_width, sleep2_mask_height, 
+        WhitePixel(disp, screen), BlackPixel(disp, screen), 
+        NEKO_DEPTH
+    );
 }
 
+void sleep_idle_anim(Display *disp, Window win, GC sleep1_gc, GC sleep2_gc, _Bool which) {
 
-// Bool  XQueryPointer(Display *display, Window w, Window *root_return, Window *child_return, int *root_x_re‐
-//     turn, int *root_y_return, int *win_x_return, int *win_y_return, unsigned int *mask_return);
+    if (!which) {
+        XShapeCombineMask(disp, win, ShapeBounding, 0, 0, sleep1_mask, ShapeSet);
+        XMapWindow(disp, win);
 
-    //  Status XGetGeometry(Display *display, Drawable d, Window *root_return, int *x_return, int  *y_return,  un‐
-    //         signed  int *width_return, unsigned int *height_return, unsigned int *border_width_return, unsigned
-    //         int *depth_return);
+        XCopyPlane(disp, sleep1, win, sleep1_gc, 0, 0, neko_width, neko_height, 0, 0, 1);
+    }
+    else {
+        
+        XShapeCombineMask(disp, win, ShapeBounding, 0, 0, sleep2_mask, ShapeSet);
+        XCopyPlane(disp, sleep2, win, sleep2_gc, 0, 0, neko_width, neko_height, 0, 0, 1);
+        XMapWindow(disp, win);
+    }
 
 
+}
 
 void neko_move(Display *disp, Window win) {
     Window root_ret, child_ret;
@@ -160,13 +172,14 @@ void neko_move(Display *disp, Window win) {
 
     XGetGeometry(disp, win, &root_ret, &neko_x, &neko_y, &width_ret, &height_ret, &border_width_ret, &dept_ret);
 
+    if ((win_x > neko_width || win_x < 0) || (win_y > neko_width || win_y < 0)) {
+        printf("%d\n", win_x);
+    }
 
-    printf("X: %d, Y: %d\n", root_x, root_y);
-    printf("NX: %d, NY: %d\n", neko_x, neko_y);
+    // printf("X: %d, Y: %d\n", win_x, win_y);
+    // printf("NX: %d, NY: %d\n", neko_x, neko_y);
 
 }
-
-
 
 int main() {
     Display *disp;
@@ -182,25 +195,30 @@ int main() {
 
     gc = create_gc(disp, root_win);
     Pixmap neko = initial_draw(disp, root_win);
+    GC sleep1_gc, sleep2_gc;
+    _Bool which = False;
 
+    sleep_idle_init(disp, root_win, &sleep1_gc, &sleep2_gc);
+    sleep_idle_anim(disp, root_win, sleep1_gc, sleep2_gc, which);
+    struct timespec tim, tim2;
+    tim.tv_sec = 0;
+    tim.tv_nsec = 500000000;
+
+    
     XEvent event;
-    int x = 0;
-    int y = 0;
-
-
     // XCopyPlane(disp, neko, root_win, gc, 0, 0, neko_width, neko_height, 0, 0, 1);
-    int c = 0;
     for ( ;; ) {
         neko_move(disp, root_win);
-        // XFree(win_name);
+        sleep_idle_anim(disp, root_win, sleep1_gc, sleep2_gc, which);
 
-        // move_neko(disp, root_win, ++x, ++y);
-        // sleep(1);
+        which = !which;
+        nanosleep(&tim, &tim2);
+
         while (XPending(disp)) {
             XNextEvent(disp, &event);
             switch (event.type) {
             case Expose:
-                XCopyPlane(disp, neko, root_win, gc, 0, 0, neko_width, neko_height, 0, 0, 1);
+
                 break;
             case ButtonPress:
                 if (event.xbutton.button == Button1) {
@@ -212,7 +230,6 @@ int main() {
                 break;
             }
         }
-        
     }
 
     return 0;
