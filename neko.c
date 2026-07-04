@@ -1,9 +1,22 @@
 #include "neko.h"
+#include <signal.h>
+#include <poll.h>
 
 #define neko_width 32
 #define neko_height 32
 
 static int w_depth;
+static uint32_t move_value_mask = CWX | CWY;
+
+static double tick = 0.1;
+static int neko_time = 125;     // sourced from oneko
+
+
+
+#define RAISE_WIN 16
+static int raise_win_delay = 0;
+
+
 
 Pixmap awake, down1, down2, dtogi1, dtogi2;
 Pixmap dwleft1, dwleft2, dwright1, dwright2;
@@ -27,6 +40,7 @@ Pixmap space_mask;
 //　I don't think there's a need for multiple GCs for each bitmap
 // If I add the different charas then they'll have different properties but for now
 // I think one GC is fine.
+
 
 struct anim_map {
     Pixmap *xmp;
@@ -74,8 +88,7 @@ typedef enum {
 } STATE;
 
 
-
-static STATE neko_state = IDLE;
+static STATE neko_state = AWAKE;
 static _Bool anim_start = False;
 static _Bool neko_still = True;
 
@@ -133,7 +146,7 @@ Window create_win(Display *disp) {
     uint32_t value_mask;
     XSetWindowAttributes attr;
 
-    attr.event_mask = ExposureMask | ButtonPressMask | StructureNotifyMask;
+    attr.event_mask = ExposureMask | ButtonPressMask | StructureNotifyMask |  VisibilityChangeMask;
     attr.override_redirect = True;
 
     value_mask = CWBackPixel | CWEventMask | CWOverrideRedirect;
@@ -201,12 +214,33 @@ Pixmap initial_draw(Display *disp, Window win) {
     return init_neko;
 }
 
+void poll_neko(Display *disp) {
+    // int disp_fd = ConnectionNumber(disp);
+
+    struct pollfd ufd;
+    ufd.fd = -1;
+    ufd.events = POLLIN;
+
+    // struct pollfd x_fd;
+    // x_fd.fd = disp_fd;
+    // x_fd.events = POLLOUT;
+
+    poll(&ufd, 1, neko_time);
+}
+
 void neko_animate(Display *disp, Window win, GC gc) {
     XShapeCombineMask(disp, win, ShapeBounding, 0, 0, *(move_states[neko_state][(int)anim_start].mask), ShapeSet);
     XCopyPlane(disp, *(move_states[neko_state][(int)anim_start].xmp), win, gc, 0, 0, neko_width, neko_height, 0, 0, 1);
+    XFlush(disp);
 
     anim_start = !anim_start;
+    poll_neko(disp);
+
 }
+
+// void neko_redraw(Display *disp, Window win) {
+//     XMapWindow(disp, win);
+// }
 
 void sleep_idle_init(Display *disp, Window win) {
     int screen = DefaultScreen(disp);
@@ -236,15 +270,12 @@ void sleep_idle_init(Display *disp, Window win) {
 }
 
 void sleep_idle_anim(Display *disp, Window win, GC gc, _Bool which) {
-
     if (!which) {
         XShapeCombineMask(disp, win, ShapeBounding, 0, 0, sleep1_mask, ShapeSet);
         // XMapWindow(disp, win);
-
         XCopyPlane(disp, sleep1, win, gc, 0, 0, neko_width, neko_height, 0, 0, 1);
     }
     else {
-        
         XShapeCombineMask(disp, win, ShapeBounding, 0, 0, sleep2_mask, ShapeSet);
         XCopyPlane(disp, sleep2, win, gc, 0, 0, neko_width, neko_height, 0, 0, 1);
         // XMapWindow(disp, win);
@@ -252,41 +283,87 @@ void sleep_idle_anim(Display *disp, Window win, GC gc, _Bool which) {
 
 }
 
-void neko_move(Display *disp, Window win) {
+// void neko_move(Display *disp, Window win) {
+    // Window root_ret, child_ret;
+    // int root_x, root_y, win_x, win_y;
+    // unsigned int mask_ret;
+
+    // _Bool xq_ret = XQueryPointer(
+    //     disp, win, &root_ret, &child_ret, &root_x, 
+    //     &root_y, &win_x, &win_y, &mask_ret
+    // );
+    // if (!xq_ret) {
+    //     fprintf(stderr, "XQueryPointer: Pointer not on same screen\n");
+    //     return;
+    // }
+
+    // int neko_x, neko_y;
+    // unsigned int width_ret, height_ret, border_width_ret, dept_ret;
+
+    // XGetGeometry(disp, win, &root_ret, &neko_x, &neko_y, &width_ret, &height_ret, &border_width_ret, &dept_ret);
+
+//     double angle = atan2(win_y, win_x);
+//     double deg_angle = angle / M_PI * 180;
+
+//     double x_mov = cosl(angle);
+//     double y_mov = sinl(angle);
+
+//     double distance = sqrt((win_x * win_x) + (win_y * win_y));
+
+//     printf("DA = %f, DX = %f, DY = %f, distance = %f\n", deg_angle, x_mov, y_mov, distance);
+
+//     // if ((win_x > neko_width || win_x < 0) || (win_y > neko_width || win_y < 0)) {
+//     //     neko_still = False;
+//     // }
+//     // printf("X: %d, Y: %d\n", win_x, win_y);
+//     // printf("NX: %d, NY: %d\n", neko_x, neko_y);
+// }
+
+
+void get_neko_pos(Display *disp, Window win, int *neko_x, int *neko_y) {
     Window root_ret, child_ret;
     int root_x, root_y, win_x, win_y;
     unsigned int mask_ret;
 
-    _Bool xq_ret = XQueryPointer(
+    _Bool x_ret = XQueryPointer(
         disp, win, &root_ret, &child_ret, &root_x, 
         &root_y, &win_x, &win_y, &mask_ret
     );
-    if (!xq_ret) {
+
+    if (!x_ret) {
         fprintf(stderr, "XQueryPointer: Pointer not on same screen\n");
         return;
     }
 
-    int neko_x, neko_y;
     unsigned int width_ret, height_ret, border_width_ret, dept_ret;
+    XGetGeometry(
+        disp, win, &root_ret, neko_x, neko_y, 
+        &width_ret, &height_ret, &border_width_ret, 
+        &dept_ret
+    );
 
-    XGetGeometry(disp, win, &root_ret, &neko_x, &neko_y, &width_ret, &height_ret, &border_width_ret, &dept_ret);
 
-    double angle = atan2(win_y, win_x);
-    double deg_angle = angle / M_PI * 180;
-
-    double x_mov = cosl(angle);
-    double y_mov = sinl(angle);
-
-    double distance = sqrt((win_x * win_x) + (win_y * win_y));
-
-    printf("DA = %f, DX = %f, DY = %f, distance = %f\n", deg_angle, x_mov, y_mov, distance);
-
-    // if ((win_x > neko_width || win_x < 0) || (win_y > neko_width || win_y < 0)) {
-    //     neko_still = False;
-    // }
-    // printf("X: %d, Y: %d\n", win_x, win_y);
-    // printf("NX: %d, NY: %d\n", neko_x, neko_y);
 }
+
+void neko_move(Display *disp, Window win, XWindowChanges *change, int ch_x, int ch_y) {
+    int neko_x, neko_y;
+    get_neko_pos(disp, win, &neko_x, &neko_y);
+    
+    if (change->x == 0 && change->y == 0) {
+        change->x = neko_x;
+        change->y = neko_y;
+    }
+    change->x += ch_x;
+    change->y += ch_y;
+
+    XConfigureWindow(disp, win, move_value_mask, change);
+}
+
+
+
+// void neko_change_state(Disp *disp, Window win) {
+//     if
+// }
 
 
 // void neko_angle(double x_mov, double y_mov) {
@@ -301,6 +378,7 @@ void change_state() {
         neko_state = AWAKE;
     }
 }
+
 
 
 int main() {
@@ -319,27 +397,41 @@ int main() {
 
     init_anim_map(disp);
     neko_animate(disp, root_win, gc);
-    XMapWindow(disp, root_win);
+    XMapWindow(disp, root_win);  
 
 
-    struct timespec tim, tim2;
-    tim.tv_sec = 0;
-    tim.tv_nsec = 500000000;
+
+    // struct timespec tim, tim2;
+    // tim.tv_sec = 0;
+    // tim.tv_nsec = 125000000;
+
     neko_state = KAKI;
     anim_start = False;
-    
+
+    XWindowChanges win_change;
+    win_change.x = 0;
+    win_change.y = 0;
+        
+
+
     XEvent event;
+    int change_x, change_y;
+    change_x = 1, change_y = 1;
+
     for ( ;; ) {
-        neko_move(disp, root_win);
-        // sleep_idle_anim(disp, root_win, gc, which);
+        neko_move(disp, root_win, &win_change, change_x, change_y);
         neko_animate(disp, root_win, gc);
 
-        nanosleep(&tim, &tim2);
+        // sleep_idle_anim(disp, root_win, gc, which);
+        // nanosleep(&tim, &tim2);
 
         while (XPending(disp)) {
             XNextEvent(disp, &event);
             switch (event.type) {
             case Expose:
+                if (event.xexpose.count == 0) {
+                    // neko_redraw(disp, root_win);
+                }
                 break;
             case ButtonPress:
                 if (event.xbutton.button == Button1) {
@@ -349,7 +441,14 @@ int main() {
                     exit(1);
                 }
                 break;
-            }
+
+            // case VisibilityNotify:
+            // if (raise_win_delay==0) {
+            //   XRaiseWindow(disp,root_win);
+            //   raise_win_delay=RAISE_WIN;
+            // }
+            // break;
+        }
         }
     }
 
