@@ -13,13 +13,22 @@ static int w_depth;
 static uint32_t move_value_mask = CWX | CWY;
 
 static int neko_time = 125;
-
+static int tick_count = 0;
 
 
 struct neko_diff {
     int rel_x;
     int rel_y;
 };
+
+struct neko_coord {
+    int dx;
+    int dy;
+    double distance;
+    double angle;
+};
+
+static struct neko_coord coords;
 
 
 Pixmap awake, down1, down2, dtogi1, dtogi2;
@@ -231,7 +240,12 @@ void neko_animate(Display *disp, Window win, GC gc) {
     XCopyPlane(disp, *(move_states[neko_state][(int)anim_start].xmp), win, gc, 0, 0, neko_width, neko_height, 0, 0, 1);
     XFlush(disp);
 
-    anim_start = !anim_start;
+    if (neko_state == SLEEP) {
+        anim_start = (tick_count >> 2) & 0x1;
+    } else {
+        anim_start = tick_count & 0x1;
+    }
+    tick_count++;
     poll_neko(disp);
 }
 
@@ -371,24 +385,23 @@ void calc_dxy(Display *disp, Window win, int *x_move, int *y_move) {
     double speed = neko_speed;
     int neko_x, neko_y;
     int cursor_x, cursor_y;
-    int dx, dy;
-    double distance; 
     double ratio;
 
     get_neko_pos(disp, win, False, &neko_x, &neko_y);
     get_cursor_pos(disp, win, &cursor_x, &cursor_y);
 
-    dx = cursor_x - (neko_x + (neko_width / 2));
-    dy = cursor_y - (neko_y + (neko_height));
+    coords.dx = cursor_x - (neko_x + (neko_width / 2));
+    coords.dy = cursor_y - (neko_y + (neko_height));
 
-    double angle = atan2(dy, dx);
-    angle *= 180.0 / PI;
+    coords.angle = atan2(coords.dy, coords.dx);
+    coords.angle *= 180.0 / PI;
+    printf("%f\n", coords.angle);
 
-    distance = sqrt((dx * dx) + (dy * dy));
-    if (distance > speed / 2) {
-        ratio = speed / distance;
-        *x_move = ratio * dx;
-        *y_move = ratio * dy;
+    coords.distance = sqrt((coords.dx * coords.dx) + (coords.dy * coords.dy));
+    if (coords.distance > speed / 2) {
+        ratio = speed / coords.distance;
+        *x_move = ratio * coords.dx;
+        *y_move = ratio * coords.dy;
 
     } else {
         *x_move = 0;
@@ -396,6 +409,25 @@ void calc_dxy(Display *disp, Window win, int *x_move, int *y_move) {
     }
 }
 
+
+void calc_angle() {
+    if (coords.angle < 35 && coords.angle >= -35) {
+        neko_state = RIGHT;
+    } else if (coords.angle >= 35 && coords.angle < 70) {
+        neko_state = DW_RIGHT;
+    } else if (coords.angle >= 70 && coords.angle < 120) {
+        neko_state = DOWN;
+    } else if (coords.angle >= 120 && coords.angle < 145) {
+        neko_state = DW_LEFT;
+    } else if ((coords.angle >= 145 && coords.angle <= 179) || (coords.angle <= -179 && coords.angle >= -145)) {
+        neko_state = LEFT;
+    } else if (coords.angle > -145 && coords.angle <= -120) {
+        neko_state = UPLEFT;
+    } else if (coords.angle > -120 && coords.angle <= -70) {
+        neko_state = UP;
+    } 
+    // TODO: do rest properly, two upleft upright, get pixmap error
+}
 
 void neko_move(Display *disp, Window win, XWindowChanges *change) {
     int neko_x, neko_y;
@@ -409,6 +441,7 @@ void neko_move(Display *disp, Window win, XWindowChanges *change) {
     // change->y += 0.13 * diff.rel_y;
     int x_move; int y_move;
     calc_dxy(disp, win, &x_move, &y_move);
+    calc_angle();
     change->x += x_move;
     change->y += y_move;
 
@@ -417,9 +450,9 @@ void neko_move(Display *disp, Window win, XWindowChanges *change) {
 
 
 void change_state() {
-    if (!neko_still && (neko_state == IDLE || neko_state == KAKI || neko_state == JARE || neko_state == SLEEP)) {
-        neko_state = AWAKE;
-    }
+    // if (!neko_still && (neko_state == IDLE || neko_state == KAKI || neko_state == JARE || neko_state == SLEEP)) {
+    //     neko_state = AWAKE;
+    // }
 }
 
 int main() {
@@ -448,7 +481,7 @@ int main() {
     // tim.tv_sec = 0;
     // tim.tv_nsec = 125000000;
 
-    neko_state = LEFT;
+    neko_state = SLEEP;
     anim_start = False;
 
     XWindowChanges win_change;
