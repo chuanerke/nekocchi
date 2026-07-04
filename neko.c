@@ -5,17 +5,20 @@
 #define neko_width 32
 #define neko_height 32
 
+#define neko_speed 13
+#define SECOND 1000 
+
 static int w_depth;
 static uint32_t move_value_mask = CWX | CWY;
 
-static double tick = 0.1;
-static int neko_time = 125;     // sourced from oneko
+static int neko_time = 125;
 
 
 
-#define RAISE_WIN 16
-static int raise_win_delay = 0;
-
+struct neko_diff {
+    int rel_x;
+    int rel_y;
+};
 
 
 Pixmap awake, down1, down2, dtogi1, dtogi2;
@@ -215,15 +218,9 @@ Pixmap initial_draw(Display *disp, Window win) {
 }
 
 void poll_neko(Display *disp) {
-    // int disp_fd = ConnectionNumber(disp);
-
     struct pollfd ufd;
     ufd.fd = -1;
     ufd.events = POLLIN;
-
-    // struct pollfd x_fd;
-    // x_fd.fd = disp_fd;
-    // x_fd.events = POLLOUT;
 
     poll(&ufd, 1, neko_time);
 }
@@ -235,7 +232,6 @@ void neko_animate(Display *disp, Window win, GC gc) {
 
     anim_start = !anim_start;
     poll_neko(disp);
-
 }
 
 // void neko_redraw(Display *disp, Window win) {
@@ -320,7 +316,7 @@ void sleep_idle_anim(Display *disp, Window win, GC gc, _Bool which) {
 // }
 
 
-void get_neko_pos(Display *disp, Window win, int *neko_x, int *neko_y) {
+void get_neko_pos(Display *disp, Window win, _Bool relative, int *neko_x, int *neko_y) {
     Window root_ret, child_ret;
     int root_x, root_y, win_x, win_y;
     unsigned int mask_ret;
@@ -335,6 +331,12 @@ void get_neko_pos(Display *disp, Window win, int *neko_x, int *neko_y) {
         return;
     }
 
+    if (relative) {
+        *neko_x = win_x;
+        *neko_y = win_y;
+        return;
+    }
+
     unsigned int width_ret, height_ret, border_width_ret, dept_ret;
     XGetGeometry(
         disp, win, &root_ret, neko_x, neko_y, 
@@ -345,16 +347,73 @@ void get_neko_pos(Display *disp, Window win, int *neko_x, int *neko_y) {
 
 }
 
-void neko_move(Display *disp, Window win, XWindowChanges *change, int ch_x, int ch_y) {
+void get_cursor_pos(Display *disp, Window win, int *cursor_x, int *cursor_y) {
+    Window root_ret, child_ret;
+    int win_x, win_y;
+    unsigned int mask_ret;
+
+    _Bool x_ret = XQueryPointer(
+        disp, win, &root_ret, &child_ret, cursor_x, 
+        cursor_y, &win_x, &win_y, &mask_ret
+    );
+}
+
+void calc_relative(Display *disp, Window win, struct neko_diff *diff) {
+    get_neko_pos(disp, win, True, &(diff->rel_x), &(diff->rel_y));
+    // diff->rel_x -= neko_width / 2;
+    // diff->rel_y -= neko_height ;
+    // printf("rel_x = %d, rel_y = %d\n", diff->rel_x, diff->rel_y);
+
+}
+
+void calc_dxy(Display *disp, Window win, int *x_move, int *y_move) {
+    double speed = neko_speed;
+    printf("%f\n", speed);
     int neko_x, neko_y;
-    get_neko_pos(disp, win, &neko_x, &neko_y);
-    
+    int cursor_x, cursor_y;
+    int dx, dy;
+    double distance;
+    double nrml_dx, nrml_dy;    
+    double ratio;
+
+    get_neko_pos(disp, win, False, &neko_x, &neko_y);
+    get_cursor_pos(disp, win, &cursor_x, &cursor_y);
+
+    dx = cursor_x - neko_x;
+    dy = cursor_y - neko_y;
+
+
+    distance = sqrt((dx * dx) + (dy * dy));
+    nrml_dx = dx / distance;
+    // printf("%f\n", distance);
+    if (distance > speed / 2) {
+        ratio = speed / distance;
+        printf("ratio %f\n", ratio);
+        *x_move = ratio * dx;
+        *y_move = ratio * dy;
+
+    } else {
+        *x_move = 0;
+        *y_move = 0;
+    }
+}
+
+
+void neko_move(Display *disp, Window win, XWindowChanges *change) {
+    int neko_x, neko_y;
+    get_neko_pos(disp, win, False, &neko_x, &neko_y);
+    struct neko_diff diff;
+    calc_relative(disp, win, &diff);
     if (change->x == 0 && change->y == 0) {
         change->x = neko_x;
         change->y = neko_y;
     }
-    change->x += ch_x;
-    change->y += ch_y;
+    // change->x += 0.13 * diff.rel_x;
+    // change->y += 0.13 * diff.rel_y;
+    int x_move; int y_move;
+    calc_dxy(disp, win, &x_move, &y_move);
+    change->x += x_move;
+    change->y += y_move;
 
     XConfigureWindow(disp, win, move_value_mask, change);
 }
@@ -391,6 +450,8 @@ int main() {
     screen = DefaultScreen(disp);
     root_win = create_win(disp);
 
+    // XSynchronize(disp, True);
+
     set_hints(disp, root_win);
 
     gc = create_gc(disp, root_win);
@@ -405,7 +466,7 @@ int main() {
     // tim.tv_sec = 0;
     // tim.tv_nsec = 125000000;
 
-    neko_state = KAKI;
+    neko_state = LEFT;
     anim_start = False;
 
     XWindowChanges win_change;
@@ -419,9 +480,9 @@ int main() {
     change_x = 1, change_y = 1;
 
     for ( ;; ) {
-        neko_move(disp, root_win, &win_change, change_x, change_y);
+        neko_move(disp, root_win, &win_change);
+        // calc_dxy(disp, root_win);
         neko_animate(disp, root_win, gc);
-
         // sleep_idle_anim(disp, root_win, gc, which);
         // nanosleep(&tim, &tim2);
 
@@ -430,7 +491,6 @@ int main() {
             switch (event.type) {
             case Expose:
                 if (event.xexpose.count == 0) {
-                    // neko_redraw(disp, root_win);
                 }
                 break;
             case ButtonPress:
@@ -448,7 +508,7 @@ int main() {
             //   raise_win_delay=RAISE_WIN;
             // }
             // break;
-        }
+            }
         }
     }
 
