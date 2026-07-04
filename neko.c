@@ -7,6 +7,7 @@
 
 #define neko_speed 13
 #define SECOND 1000 
+#define PI 3.141592654
 
 static int w_depth;
 static uint32_t move_value_mask = CWX | CWY;
@@ -368,12 +369,10 @@ void calc_relative(Display *disp, Window win, struct neko_diff *diff) {
 
 void calc_dxy(Display *disp, Window win, int *x_move, int *y_move) {
     double speed = neko_speed;
-    printf("%f\n", speed);
     int neko_x, neko_y;
     int cursor_x, cursor_y;
     int dx, dy;
-    double distance;
-    double nrml_dx, nrml_dy;    
+    double distance; 
     double ratio;
 
     get_neko_pos(disp, win, False, &neko_x, &neko_y);
@@ -382,16 +381,12 @@ void calc_dxy(Display *disp, Window win, int *x_move, int *y_move) {
     dx = cursor_x - (neko_x + (neko_width / 2));
     dy = cursor_y - (neko_y + (neko_height));
 
-    // dx -= neko_width / 2;
-    // dy += neko_height / 2;
-
+    double angle = atan2(dy, dx);
+    angle *= 180.0 / PI;
 
     distance = sqrt((dx * dx) + (dy * dy));
-    nrml_dx = dx / distance;
-    // printf("%f\n", distance);
     if (distance > speed / 2) {
         ratio = speed / distance;
-        printf("ratio %f\n", ratio);
         *x_move = ratio * dx;
         *y_move = ratio * dy;
 
@@ -405,8 +400,7 @@ void calc_dxy(Display *disp, Window win, int *x_move, int *y_move) {
 void neko_move(Display *disp, Window win, XWindowChanges *change) {
     int neko_x, neko_y;
     get_neko_pos(disp, win, False, &neko_x, &neko_y);
-    struct neko_diff diff;
-    calc_relative(disp, win, &diff);
+
     if (change->x == 0 && change->y == 0) {
         change->x = neko_x;
         change->y = neko_y;
@@ -422,26 +416,11 @@ void neko_move(Display *disp, Window win, XWindowChanges *change) {
 }
 
 
-
-// void neko_change_state(Disp *disp, Window win) {
-//     if
-// }
-
-
-// void neko_angle(double x_mov, double y_mov) {
-//     if (y_mov ) {
-//         if (x_mov )
-//     } 
-// }
-
-
 void change_state() {
     if (!neko_still && (neko_state == IDLE || neko_state == KAKI || neko_state == JARE || neko_state == SLEEP)) {
         neko_state = AWAKE;
     }
 }
-
-
 
 int main() {
     Display *disp;
@@ -483,9 +462,10 @@ int main() {
     change_x = 1, change_y = 1;
 
     for ( ;; ) {
+        neko_animate(disp, root_win, gc);
+
         neko_move(disp, root_win, &win_change);
         // calc_dxy(disp, root_win);
-        neko_animate(disp, root_win, gc);
         // sleep_idle_anim(disp, root_win, gc, which);
         // nanosleep(&tim, &tim2);
 
