@@ -379,8 +379,11 @@ void calc_dxy(Display *disp, Window win, int *x_move, int *y_move) {
     get_neko_pos(disp, win, False, &neko_x, &neko_y);
     get_cursor_pos(disp, win, &cursor_x, &cursor_y);
 
-    dx = cursor_x - neko_x;
-    dy = cursor_y - neko_y;
+    dx = cursor_x - (neko_x + (neko_width / 2));
+    dy = cursor_y - (neko_y + (neko_height));
+
+    // dx -= neko_width / 2;
+    // dy += neko_height / 2;
 
 
     distance = sqrt((dx * dx) + (dy * dy));
