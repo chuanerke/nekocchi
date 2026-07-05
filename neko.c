@@ -151,8 +151,8 @@ typedef struct {
     int neko_speed;
     int neko_time;
     State neko_state;
-    int tick_count;
-    int state_count;
+    uint16_t tick_count;
+    uint16_t state_count;
 } Neko;
 
 Neko neko = {
@@ -533,13 +533,8 @@ int main(int argc, char **argv) {
     GC gc;
 
     assert((disp = XOpenDisplay((char *)0)) != NULL);
-    
     root_win = create_win(disp);
-
-    // XSynchronize(disp, True);
-
     set_hints(disp, root_win);
-
     gc = create_gc(disp, root_win);
 
     init_anim_map(disp);
