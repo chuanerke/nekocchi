@@ -11,7 +11,7 @@
 #define SECOND 1000 
 #define PI 3.141592654
 
-// TODO: Set cursors, improve structure, add color, command-line arguments, improve angle logic
+// TODO: Set cursors, improve structure, add color, improve angle logic
 // mouse_cursor.xbm
 
 
@@ -200,6 +200,14 @@ void init_anim_map(Display *disp) {
             WhitePixel(disp, screen), BlackPixel(disp, screen), 
             NEKO_DEPTH
         );
+    }
+}
+
+void free_pixmaps(Display *disp) {
+    size_t len = sizeof(maps) / sizeof(maps[0]);
+    for (size_t i = 0; i < len; i++) {
+        XFreePixmap(disp, *(maps[i].xmp));
+        XFreePixmap(disp, *(maps[i].mask));
     }
 }
 
@@ -428,7 +436,7 @@ size_t get_state_index(State check_state) {
     for (size_t i = 0; i < len; i++) {
         // printf("i = %d val = %s\n", i, state_str[i]);
         if (still_states[i].state == check_state) {
-            printf("i = %d, state = %s\n", i , state_str[i]);
+            // printf("i = %d, state = %s\n", i , state_str[i]);
             // printf("%d\n", still_states[2].count_time);
             return i;
         }
@@ -436,7 +444,6 @@ size_t get_state_index(State check_state) {
     fprintf(stderr, "State not in still_states\n");
     return -1;
 }
-
 
 void state_timing(Display *disp, Window win, int x_move, int y_move) {
     _Bool move = x_move == 0 && y_move == 0;
@@ -457,8 +464,8 @@ void state_timing(Display *disp, Window win, int x_move, int y_move) {
         if (state_count < still_states[ind].count_time) break;
         if (move) change_state(still_states[ind].next_state);
         if (neko_state == AWAKE && !move) neko_move(disp, win, x_move, y_move);
-
         break;
+
     case DOWN:
     case DW_LEFT:
     case DW_RIGHT:
@@ -469,14 +476,22 @@ void state_timing(Display *disp, Window win, int x_move, int y_move) {
     case UPRIGHT:
         if (move) change_state(IDLE);
         if (!move) neko_move(disp, win, x_move, y_move);
-        
-        break;   
+        break; 
+
     case SLEEP:
         break;
     default:
         change_state(AWAKE);
         break;
     }
+}
+
+void free_resources(Display *disp, Window root_win, GC gc) {
+    XFreeGC(disp, gc);
+    free_pixmaps(disp);
+    XDestroyWindow(disp, root_win);
+    XCloseDisplay(disp);
+    exit(1);
 }
 
 void event_handler(Display *disp, Window root_win, GC gc, XEvent event) {
@@ -489,19 +504,11 @@ void event_handler(Display *disp, Window root_win, GC gc, XEvent event) {
             break;
         case ButtonPress:
             if (event.xbutton.button == Button1) {
-                XFreeGC(disp, gc);
-                XDestroyWindow(disp, root_win);
-                XCloseDisplay(disp);
-                exit(1);
+                free_resources(disp, root_win, gc);
             }
             break;
-
-        // case VisibilityNotify:
-        // if (raise_win_delay==0) {
-        //   XRaiseWindow(disp,root_win);
-        //   raise_win_delay=RAISE_WIN;
-        // }
-        // break;
+        case VisibilityNotify:
+            break;
         }
     }
 }
