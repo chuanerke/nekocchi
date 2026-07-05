@@ -1,5 +1,4 @@
 #include "neko.h"
-#include <signal.h>
 #include <poll.h>
 
 #define neko_width 32
@@ -15,10 +14,7 @@ static uint32_t move_value_mask = CWX | CWY;
 static int neko_time = 125;
 static int tick_count = 0;
 
-
 static XWindowChanges win_change;
-
-
 
 struct neko_diff {
     int rel_x;
@@ -31,9 +27,6 @@ struct neko_coord {
     double distance;
     double angle;
 };
-
-static int prev_x, prev_y;
-
 
 static struct neko_coord coords;
 
@@ -84,7 +77,6 @@ struct anim_map maps[] =  {
 };
 
 
-
 typedef enum {
     IDLE,
     AKUBI,
@@ -103,10 +95,9 @@ typedef enum {
     UPLEFT,
     UPRIGHT,
     UTOGI
-} STATE;
+} State;
 
-
-static STATE neko_state = AWAKE;
+static State neko_state = AWAKE;
 static _Bool anim_start = False;
 static _Bool neko_still = True;
 
@@ -142,7 +133,6 @@ void init_anim_map(Display *disp) {
     int screen = DefaultScreen(disp);
 
     size_t len = sizeof(maps) / sizeof(maps[0]);
-    printf("LEN = %d\n", len);
     for (size_t i = 0; i < len; i++) {
         *(maps[i].xmp) = XCreatePixmapFromBitmapData(
             disp, RootWindow(disp, screen), maps[i].xmp_bits, neko_width, neko_height, 
@@ -217,7 +207,7 @@ GC create_gc(Display *disp, Window win) {
     return gc;
 } 
 
-void poll_neko(Display *disp) {
+void poll_neko() {
     struct pollfd ufd;
     ufd.fd = -1;
     ufd.events = POLLIN;
@@ -237,13 +227,9 @@ void neko_animate(Display *disp, Window win, GC gc) {
         printf("%d\n", anim_start);
     }
     tick_count++;
-    // state_count += (tick_count & 0x1);
-    if ((tick_count % 2) == 0) {
-        state_count++;
-    }
-    printf("state %d\n", state_count);
+    state_count += (tick_count & 0x1);
 
-    poll_neko(disp);
+    poll_neko();
 }
 
 void get_neko_pos(Display *disp, Window win, _Bool relative, int *neko_x, int *neko_y) {
@@ -287,7 +273,7 @@ void get_cursor_pos(Display *disp, Window win, int *cursor_x, int *cursor_y) {
 }
 
 
-void change_state(STATE ch_state) {
+void change_state(State ch_state) {
     state_count = 0;
     tick_count = 0;
 
@@ -309,7 +295,6 @@ void calc_dxy(Display *disp, Window win, int *x_move, int *y_move) {
 
     coords.angle = atan2(coords.dy, coords.dx);
     coords.angle *= 180.0 / PI;
-    printf("%f\n", coords.angle);
 
     coords.distance = sqrt((coords.dx * coords.dx) + (coords.dy * coords.dy));
     if (coords.distance > speed / 2) {
@@ -341,7 +326,6 @@ void calc_angle() {
     } else if (coords.angle > -60 && coords.angle < -25) {
         neko_state = UPRIGHT;
     }
-    // TODO: do rest properly, two upleft upright, get pixmap error
 }
 
 void neko_move(Display *disp, Window win) {
@@ -372,47 +356,40 @@ void state_timing(Display *disp, Window win, int x_move, int y_move) {
     }
 
     switch (neko_state) {
-
     case IDLE:
         if (state_count < NEKO_IDLE_TIME) {
             break;
-        }
-        if (x_move == 0 && y_move == 0) {
+        } if (x_move == 0 && y_move == 0) {
             change_state(JARE);
         }
         break;
     case JARE:
         if (state_count < NEKO_JARE_TIME) {
             break;
-        }
-        if (x_move == 0 && y_move == 0) {
+        } if (x_move == 0 && y_move == 0) {
             change_state(KAKI);
         }
         break; 
     case KAKI:
         if (state_count < NEKO_KAKI_TIME) {
             break;
-        }
-        if (x_move == 0 && y_move == 0) {
+        } if (x_move == 0 && y_move == 0) {
             change_state(AKUBI);
         }
         break;
     case AKUBI:
         if (state_count < NEKO_AKUBI_TIME) {
             break;
-        }
-        if (x_move == 0 && y_move == 0) {
+        } if (x_move == 0 && y_move == 0) {
             change_state(SLEEP);
         }
         break;
     case AWAKE:
         if (state_count < NEKO_AWAKE_TIME) {
             break;
-        }
-        if (x_move == 0 && y_move == 0) {
+        } if (x_move == 0 && y_move == 0) {
             change_state(IDLE);
-        }
-        if (x_move != 0 || y_move != 0) {
+        } if (x_move != 0 || y_move != 0) {
             neko_move(disp, win);
         }
         break;
@@ -426,8 +403,7 @@ void state_timing(Display *disp, Window win, int x_move, int y_move) {
     case UPRIGHT:
         if (x_move == 0 && y_move == 0) {
             change_state(IDLE);
-        }
-        if (x_move != 0 || y_move != 0) {
+        } if (x_move != 0 || y_move != 0) {
             neko_move(disp, win);
         }
         break;
@@ -443,11 +419,9 @@ void state_timing(Display *disp, Window win, int x_move, int y_move) {
 int main() {
     Display *disp;
     Window root_win;
-    int screen;
     GC gc;
 
     disp = XOpenDisplay((char *)0);
-    screen = DefaultScreen(disp);
     root_win = create_win(disp);
 
     // XSynchronize(disp, True);
