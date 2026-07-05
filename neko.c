@@ -287,7 +287,7 @@ void get_cursor_pos(Display *disp, Window win, int *cursor_x, int *cursor_y) {
 }
 
 
-void change_state(int ch_state) {
+void change_state(STATE ch_state) {
     state_count = 0;
     tick_count = 0;
 
@@ -322,6 +322,7 @@ void calc_dxy(Display *disp, Window win, int *x_move, int *y_move) {
         *y_move = 0;
     }
 }
+
 void calc_angle() {
     if (coords.angle < 25 && coords.angle >= -25) {
         neko_state = RIGHT;
@@ -331,7 +332,7 @@ void calc_angle() {
         neko_state = DOWN;
     } else if (coords.angle >= 115 && coords.angle < 165) {
         neko_state = DW_LEFT;
-    } else if ((coords.angle >= 165 && coords.angle <= 179) || (coords.angle <= -179 && coords.angle >= -155)) {
+    } else if ((coords.angle >= 165 && coords.angle <= 180) || (coords.angle >= -180 && coords.angle <= -155)) {
         neko_state = LEFT;
     } else if (coords.angle > -155 && coords.angle <= -115) {
         neko_state = UPLEFT;
@@ -459,15 +460,13 @@ int main() {
     neko_animate(disp, root_win, gc);
     XMapWindow(disp, root_win);  
 
-    neko_state = AWAKE;
+    neko_state = IDLE;
     anim_start = False;
 
     win_change.x = 0;
     win_change.y = 0;
 
     XEvent event;
-    int change_x, change_y;
-    change_x = 1, change_y = 1;
     int x_move, y_move;
     calc_dxy(disp, root_win, &x_move, &y_move);
 
