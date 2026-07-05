@@ -2,6 +2,8 @@
 #include <poll.h>
 #include <argp.h>
 
+#define ENUM_STR(ENUM_VAL) #ENUM_VAL
+
 #define neko_width 32
 #define neko_height 32
 
@@ -399,51 +401,63 @@ void neko_move(Display *disp, Window win, int x_move, int y_move) {
     XFlush(disp);
 }
 
+struct still_state {
+    State state;
+    int count_time;
+    State next_state;
+};
+
+struct still_state still_states[5] = {
+    {IDLE, NEKO_IDLE_TIME, JARE}, {JARE, NEKO_JARE_TIME, KAKI},
+    {KAKI, NEKO_KAKI_TIME, AKUBI}, {AKUBI, NEKO_AKUBI_TIME, SLEEP},
+    {AWAKE, NEKO_AWAKE_TIME, IDLE}
+};
+
+// debug
+const char * state_str[] = {
+    ENUM_STR(IDLE),
+    ENUM_STR(JARE),
+    ENUM_STR(KAKI),
+    ENUM_STR(AKUBI),
+    ENUM_STR(AWAKE)
+};
+
+size_t get_state_index(State check_state) {
+    size_t len = sizeof(still_states) / sizeof(still_states[0]);
+    // printf("%d\n", len);
+    for (size_t i = 0; i < len; i++) {
+        // printf("i = %d val = %s\n", i, state_str[i]);
+        if (still_states[i].state == check_state) {
+            printf("i = %d, state = %s\n", i , state_str[i]);
+            // printf("%d\n", still_states[2].count_time);
+            return i;
+        }
+    }
+    fprintf(stderr, "State not in still_states\n");
+    return -1;
+}
+
 
 void state_timing(Display *disp, Window win, int x_move, int y_move) {
+    _Bool move = x_move == 0 && y_move == 0;
     if (neko_state == IDLE || neko_state == JARE ||  neko_state == KAKI  || neko_state == AKUBI || neko_state == SLEEP) {
-        if ((x_move != 0 || y_move != 0) && neko_state != AWAKE) {
+        if (!move && neko_state != AWAKE) {
             change_state(AWAKE);
         }
     }
 
     switch (neko_state) {
     case IDLE:
-        if (state_count < NEKO_IDLE_TIME) {
-            break;
-        } if (x_move == 0 && y_move == 0) {
-            change_state(JARE);
-        }
-        break;
     case JARE:
-        if (state_count < NEKO_JARE_TIME) {
-            break;
-        } if (x_move == 0 && y_move == 0) {
-            change_state(KAKI);
-        }
-        break; 
     case KAKI:
-        if (state_count < NEKO_KAKI_TIME) {
-            break;
-        } if (x_move == 0 && y_move == 0) {
-            change_state(AKUBI);
-        }
-        break;
     case AKUBI:
-        if (state_count < NEKO_AKUBI_TIME) {
-            break;
-        } if (x_move == 0 && y_move == 0) {
-            change_state(SLEEP);
-        }
-        break;
     case AWAKE:
-        if (state_count < NEKO_AWAKE_TIME) {
-            break;
-        } if (x_move == 0 && y_move == 0) {
-            change_state(IDLE);
-        } if (x_move != 0 || y_move != 0) {
-            neko_move(disp, win, x_move, y_move);
-        }
+        size_t ind = get_state_index(neko_state);
+
+        if (state_count < still_states[ind].count_time) break;
+        if (move) change_state(still_states[ind].next_state);
+        if (neko_state == AWAKE && !move) neko_move(disp, win, x_move, y_move);
+
         break;
     case DOWN:
     case DW_LEFT:
@@ -453,12 +467,10 @@ void state_timing(Display *disp, Window win, int x_move, int y_move) {
     case UP:
     case UPLEFT:
     case UPRIGHT:
-        if (x_move == 0 && y_move == 0) {
-            change_state(IDLE);
-        } if (x_move != 0 || y_move != 0) {
-            neko_move(disp, win, x_move, y_move);
-        }
-        break;
+        if (move) change_state(IDLE);
+        if (!move) neko_move(disp, win, x_move, y_move);
+        
+        break;   
     case SLEEP:
         break;
     default:
@@ -495,7 +507,6 @@ void event_handler(Display *disp, Window root_win, GC gc, XEvent event) {
 }
 
 static struct argp argp = { options, parse_opt, args_doc, doc };
-
 
 int main(int argc, char **argv) {
     struct arguments arguments;
