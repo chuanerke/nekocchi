@@ -323,21 +323,21 @@ void calc_dxy(Display *disp, Window win, int *x_move, int *y_move) {
     }
 }
 void calc_angle() {
-    if (coords.angle < 35 && coords.angle >= -35) {
+    if (coords.angle < 25 && coords.angle >= -25) {
         neko_state = RIGHT;
-    } else if (coords.angle >= 35 && coords.angle < 70) {
+    } else if (coords.angle >= 25 && coords.angle < 55) {
         neko_state = DW_RIGHT;
-    } else if (coords.angle >= 70 && coords.angle < 120) {
+    } else if (coords.angle >= 55 && coords.angle < 115) {
         neko_state = DOWN;
-    } else if (coords.angle >= 120 && coords.angle < 145) {
+    } else if (coords.angle >= 115 && coords.angle < 165) {
         neko_state = DW_LEFT;
-    } else if ((coords.angle >= 145 && coords.angle <= 179) || (coords.angle <= -179 && coords.angle >= -145)) {
+    } else if ((coords.angle >= 165 && coords.angle <= 179) || (coords.angle <= -179 && coords.angle >= -155)) {
         neko_state = LEFT;
-    } else if (coords.angle > -145 && coords.angle <= -120) {
+    } else if (coords.angle > -155 && coords.angle <= -115) {
         neko_state = UPLEFT;
-    } else if (coords.angle > -120 && coords.angle <= -70) {
+    } else if (coords.angle > -115 && coords.angle <= -60) {
         neko_state = UP;
-    } else if (coords.angle > -70 && coords.angle < -35) {
+    } else if (coords.angle > -60 && coords.angle < -25) {
         neko_state = UPRIGHT;
     }
     // TODO: do rest properly, two upleft upright, get pixmap error
