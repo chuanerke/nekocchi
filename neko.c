@@ -1,18 +1,71 @@
 #include "neko.h"
 #include <poll.h>
+#include <argp.h>
 
 #define neko_width 32
 #define neko_height 32
 
-#define neko_speed 13
+// #define neko_speed 13
 #define SECOND 1000 
 #define PI 3.141592654
+
+// TODO: Set cursors, improve structure, add color, command-line arguments, improve angle logic
+// mouse_cursor.xbm
+
 
 static int w_depth;
 static uint32_t move_value_mask = CWX | CWY;
 
+static int neko_speed = 13;
 static int neko_time = 125;
 static int tick_count = 0;
+
+
+static char doc[] = "Oneko recreation in Xlib/C";
+static char args_doc[] = "NEKOCCHI";
+
+static struct argp_option options[] = {
+    {"speed", 's', "SPEED", 0, "neko speed (default: 13)"},
+    {"time", 't', "TIME", 0, "time in milliseconds (default: 125)"},
+    { 0 },
+};
+
+struct arguments {
+    char *args[2];
+    char *speed;
+    char *time;
+};
+
+static error_t parse_opt(int key, char *arg, struct argp_state *state) { 
+    struct arguments *arguments = state->input;
+
+    switch (key) {
+    case 's':
+        arguments->speed = arg;
+        break;
+    case 't':
+        arguments->time = arg;
+        break;
+
+    case ARGP_KEY_ARG:
+        if (state->arg_num >= 1) {
+            argp_usage(state);
+        }
+
+        arguments->args[state->arg_num] = arg;
+        break;
+    case ARGP_KEY_END:
+        // if (state->arg_num < 0) {
+        //     argp_usage(state);
+        // }
+        break;
+        
+    default:
+        return ARGP_ERR_UNKNOWN;
+    }
+    return 0;
+}
+
 
 static XWindowChanges win_change;
 
@@ -224,7 +277,6 @@ void neko_animate(Display *disp, Window win, GC gc) {
         anim_start = (tick_count >> 2) & 0x1;
     } else {
         anim_start = tick_count & 0x1;
-        printf("%d\n", anim_start);
     }
     tick_count++;
     state_count += (tick_count & 0x1);
@@ -328,7 +380,7 @@ void calc_angle() {
     }
 }
 
-void neko_move(Display *disp, Window win) {
+void neko_move(Display *disp, Window win, int x_move, int y_move) {
     int neko_x, neko_y;
     get_neko_pos(disp, win, False, &neko_x, &neko_y);
 
@@ -337,8 +389,8 @@ void neko_move(Display *disp, Window win) {
         win_change.y = neko_y;
     }
 
-    int x_move; int y_move;
-    calc_dxy(disp, win, &x_move, &y_move);
+    // int x_move; int y_move;
+    // calc_dxy(disp, win, &x_move, &y_move);
     calc_angle();
     win_change.x += x_move;
     win_change.y += y_move;
@@ -390,7 +442,7 @@ void state_timing(Display *disp, Window win, int x_move, int y_move) {
         } if (x_move == 0 && y_move == 0) {
             change_state(IDLE);
         } if (x_move != 0 || y_move != 0) {
-            neko_move(disp, win);
+            neko_move(disp, win, x_move, y_move);
         }
         break;
     case DOWN:
@@ -404,7 +456,7 @@ void state_timing(Display *disp, Window win, int x_move, int y_move) {
         if (x_move == 0 && y_move == 0) {
             change_state(IDLE);
         } if (x_move != 0 || y_move != 0) {
-            neko_move(disp, win);
+            neko_move(disp, win, x_move, y_move);
         }
         break;
     case SLEEP:
@@ -415,8 +467,47 @@ void state_timing(Display *disp, Window win, int x_move, int y_move) {
     }
 }
 
+void event_handler(Display *disp, Window root_win, GC gc, XEvent event) {
+    while (XPending(disp)) {
+        XNextEvent(disp, &event);
+        switch (event.type) {
+        case Expose:
+            if (event.xexpose.count == 0) {
+            }
+            break;
+        case ButtonPress:
+            if (event.xbutton.button == Button1) {
+                XFreeGC(disp, gc);
+                XDestroyWindow(disp, root_win);
+                XCloseDisplay(disp);
+                exit(1);
+            }
+            break;
 
-int main() {
+        // case VisibilityNotify:
+        // if (raise_win_delay==0) {
+        //   XRaiseWindow(disp,root_win);
+        //   raise_win_delay=RAISE_WIN;
+        // }
+        // break;
+        }
+    }
+}
+
+static struct argp argp = { options, parse_opt, args_doc, doc };
+
+
+int main(int argc, char **argv) {
+    struct arguments arguments;
+
+    arguments.speed = "13";
+    arguments.time = "125";
+
+    argp_parse(&argp, argc, argv, 0, 0, &arguments);
+    
+    neko_speed = atoi(arguments.speed);
+    neko_time = atoi(arguments.time);
+
     Display *disp;
     Window root_win;
     GC gc;
@@ -440,41 +531,17 @@ int main() {
     win_change.x = 0;
     win_change.y = 0;
 
-    XEvent event;
     int x_move, y_move;
     calc_dxy(disp, root_win, &x_move, &y_move);
 
+    XEvent event;
 
     for ( ;; ) {
         neko_animate(disp, root_win, gc);
         state_timing(disp, root_win, x_move, y_move);
         calc_dxy(disp, root_win, &x_move, &y_move);
 
-
-        while (XPending(disp)) {
-            XNextEvent(disp, &event);
-            switch (event.type) {
-            case Expose:
-                if (event.xexpose.count == 0) {
-                }
-                break;
-            case ButtonPress:
-                if (event.xbutton.button == Button1) {
-                    XFreeGC(disp, gc);
-                    XDestroyWindow(disp, root_win);
-                    XCloseDisplay(disp);
-                    exit(1);
-                }
-                break;
-
-            // case VisibilityNotify:
-            // if (raise_win_delay==0) {
-            //   XRaiseWindow(disp,root_win);
-            //   raise_win_delay=RAISE_WIN;
-            // }
-            // break;
-            }
-        }
+        event_handler(disp, root_win, gc, event);
     }
 
     return 0;
