@@ -16,3 +16,11 @@
 #include "bitmasks/neko/neko.mask.include"
 
 #define NEKO_DEPTH 1
+
+// sourced from oneko-sakura
+#define NEKO_IDLE_TIME 4
+#define NEKO_JARE_TIME 10
+#define NEKO_KAKI_TIME 4
+#define NEKO_AKUBI_TIME 6       
+#define NEKO_AWAKE_TIME 3
+#define NEKO_TOGI_TIME 10

@@ -16,6 +16,10 @@ static int neko_time = 125;
 static int tick_count = 0;
 
 
+static XWindowChanges win_change;
+
+
+
 struct neko_diff {
     int rel_x;
     int rel_y;
@@ -27,6 +31,9 @@ struct neko_coord {
     double distance;
     double angle;
 };
+
+static int prev_x, prev_y;
+
 
 static struct neko_coord coords;
 
@@ -50,11 +57,6 @@ Pixmap upleft1_mask, upleft2_mask, upright1_mask, upright2_mask;
 Pixmap utogi1_mask, utogi2_mask;
 Pixmap space_mask;
 
-//　I don't think there's a need for multiple GCs for each bitmap
-// If I add the different charas then they'll have different properties but for now
-// I think one GC is fine.
-
-
 struct anim_map {
     Pixmap *xmp;
     Pixmap *mask;
@@ -77,12 +79,15 @@ struct anim_map maps[] =  {
     {&sleep1, &sleep1_mask, sleep1_bits, sleep1_mask_bits}, {&sleep2, &sleep2_mask, sleep2_bits, sleep2_mask_bits}, 
     {&up1, &up1_mask, up1_bits, up1_mask_bits}, {&up2, &up2_mask, up2_bits, up2_mask_bits}, 
     {&upleft1, &upleft1_mask, upleft1_bits, upleft1_mask_bits}, {&upleft2, &upleft2_mask, upleft2_bits, upleft2_mask_bits}, 
-    {&upright2, &upright2_mask, upright2_bits, upright2_mask_bits}, {&utogi1, &utogi1_mask, utogi1_bits, utogi1_mask_bits}, 
-    {&utogi2, &utogi2_mask, utogi2_bits, utogi2_mask_bits}
+    {&upright1, &upright1_mask, upright1_bits, upright1_mask_bits}, {&upright2, &upright2_mask, upright2_bits, upright2_mask_bits},
+    {&utogi1, &utogi1_mask, utogi1_bits, utogi1_mask_bits}, {&utogi2, &utogi2_mask, utogi2_bits, utogi2_mask_bits}
 };
+
+
 
 typedef enum {
     IDLE,
+    AKUBI,
     AWAKE,
     DOWN,
     DTOGI,
@@ -105,6 +110,8 @@ static STATE neko_state = AWAKE;
 static _Bool anim_start = False;
 static _Bool neko_still = True;
 
+static int state_count = 0;
+
 struct animation {
     Pixmap *xmp;
     Pixmap *mask;
@@ -112,6 +119,7 @@ struct animation {
 
 struct animation move_states[][2] = {
     {{&mati2, &mati2_mask}, {&mati2, &mati2_mask}}, 
+    {{&mati3, &mati3_mask}, {&mati3, &mati3_mask }},
     {{&awake, &awake_mask}, {&awake, &awake_mask}},
     {{&down1, &down1_mask}, {&down2, &down2_mask}},
     {{&dtogi1, &dtogi1_mask}, {&dtogi2, &dtogi2_mask}},
@@ -134,6 +142,7 @@ void init_anim_map(Display *disp) {
     int screen = DefaultScreen(disp);
 
     size_t len = sizeof(maps) / sizeof(maps[0]);
+    printf("LEN = %d\n", len);
     for (size_t i = 0; i < len; i++) {
         *(maps[i].xmp) = XCreatePixmapFromBitmapData(
             disp, RootWindow(disp, screen), maps[i].xmp_bits, neko_width, neko_height, 
@@ -208,25 +217,6 @@ GC create_gc(Display *disp, Window win) {
     return gc;
 } 
 
-Pixmap initial_draw(Display *disp, Window win) {
-    int screen = DefaultScreen(disp);
-    Pixmap init_neko = XCreatePixmapFromBitmapData(
-        disp, RootWindow(disp, screen), awake_bits, awake_width, awake_height, 
-        BlackPixel(disp, screen), WhitePixel(disp, screen), 
-        NEKO_DEPTH
-    );
-
-    Pixmap neko_mask = XCreatePixmapFromBitmapData(
-        disp, RootWindow(disp, screen), awake_mask_bits, awake_mask_width, awake_mask_height, 
-        WhitePixel(disp, screen), BlackPixel(disp, screen), 
-        NEKO_DEPTH
-    );
-
-    XShapeCombineMask(disp, win, ShapeBounding, 0, 0, neko_mask, ShapeSet);
-
-    return init_neko;
-}
-
 void poll_neko(Display *disp) {
     struct pollfd ufd;
     ufd.fd = -1;
@@ -244,92 +234,17 @@ void neko_animate(Display *disp, Window win, GC gc) {
         anim_start = (tick_count >> 2) & 0x1;
     } else {
         anim_start = tick_count & 0x1;
+        printf("%d\n", anim_start);
     }
     tick_count++;
+    // state_count += (tick_count & 0x1);
+    if ((tick_count % 2) == 0) {
+        state_count++;
+    }
+    printf("state %d\n", state_count);
+
     poll_neko(disp);
 }
-
-// void neko_redraw(Display *disp, Window win) {
-//     XMapWindow(disp, win);
-// }
-
-void sleep_idle_init(Display *disp, Window win) {
-    int screen = DefaultScreen(disp);
-    sleep1 = XCreatePixmapFromBitmapData(
-        disp, RootWindow(disp, screen), sleep1_bits, sleep1_width, sleep1_height, 
-        BlackPixel(disp, screen), WhitePixel(disp, screen), 
-        NEKO_DEPTH
-    );
-
-    sleep1_mask = XCreatePixmapFromBitmapData(
-        disp, RootWindow(disp, screen), sleep1_mask_bits, sleep1_mask_width, sleep1_mask_height, 
-        WhitePixel(disp, screen), BlackPixel(disp, screen), 
-        NEKO_DEPTH
-    );
-
-    sleep2 = XCreatePixmapFromBitmapData(
-        disp, RootWindow(disp, screen), sleep2_bits, sleep2_width, sleep2_height, 
-        BlackPixel(disp, screen), WhitePixel(disp, screen), 
-        NEKO_DEPTH
-    );
-    
-    sleep2_mask = XCreatePixmapFromBitmapData(
-        disp, RootWindow(disp, screen), sleep2_mask_bits, sleep2_mask_width, sleep2_mask_height, 
-        WhitePixel(disp, screen), BlackPixel(disp, screen), 
-        NEKO_DEPTH
-    );
-}
-
-void sleep_idle_anim(Display *disp, Window win, GC gc, _Bool which) {
-    if (!which) {
-        XShapeCombineMask(disp, win, ShapeBounding, 0, 0, sleep1_mask, ShapeSet);
-        // XMapWindow(disp, win);
-        XCopyPlane(disp, sleep1, win, gc, 0, 0, neko_width, neko_height, 0, 0, 1);
-    }
-    else {
-        XShapeCombineMask(disp, win, ShapeBounding, 0, 0, sleep2_mask, ShapeSet);
-        XCopyPlane(disp, sleep2, win, gc, 0, 0, neko_width, neko_height, 0, 0, 1);
-        // XMapWindow(disp, win);
-    }
-
-}
-
-// void neko_move(Display *disp, Window win) {
-    // Window root_ret, child_ret;
-    // int root_x, root_y, win_x, win_y;
-    // unsigned int mask_ret;
-
-    // _Bool xq_ret = XQueryPointer(
-    //     disp, win, &root_ret, &child_ret, &root_x, 
-    //     &root_y, &win_x, &win_y, &mask_ret
-    // );
-    // if (!xq_ret) {
-    //     fprintf(stderr, "XQueryPointer: Pointer not on same screen\n");
-    //     return;
-    // }
-
-    // int neko_x, neko_y;
-    // unsigned int width_ret, height_ret, border_width_ret, dept_ret;
-
-    // XGetGeometry(disp, win, &root_ret, &neko_x, &neko_y, &width_ret, &height_ret, &border_width_ret, &dept_ret);
-
-//     double angle = atan2(win_y, win_x);
-//     double deg_angle = angle / M_PI * 180;
-
-//     double x_mov = cosl(angle);
-//     double y_mov = sinl(angle);
-
-//     double distance = sqrt((win_x * win_x) + (win_y * win_y));
-
-//     printf("DA = %f, DX = %f, DY = %f, distance = %f\n", deg_angle, x_mov, y_mov, distance);
-
-//     // if ((win_x > neko_width || win_x < 0) || (win_y > neko_width || win_y < 0)) {
-//     //     neko_still = False;
-//     // }
-//     // printf("X: %d, Y: %d\n", win_x, win_y);
-//     // printf("NX: %d, NY: %d\n", neko_x, neko_y);
-// }
-
 
 void get_neko_pos(Display *disp, Window win, _Bool relative, int *neko_x, int *neko_y) {
     Window root_ret, child_ret;
@@ -340,7 +255,6 @@ void get_neko_pos(Display *disp, Window win, _Bool relative, int *neko_x, int *n
         disp, win, &root_ret, &child_ret, &root_x, 
         &root_y, &win_x, &win_y, &mask_ret
     );
-
     if (!x_ret) {
         fprintf(stderr, "XQueryPointer: Pointer not on same screen\n");
         return;
@@ -359,7 +273,6 @@ void get_neko_pos(Display *disp, Window win, _Bool relative, int *neko_x, int *n
         &dept_ret
     );
 
-
 }
 
 void get_cursor_pos(Display *disp, Window win, int *cursor_x, int *cursor_y) {
@@ -373,13 +286,14 @@ void get_cursor_pos(Display *disp, Window win, int *cursor_x, int *cursor_y) {
     );
 }
 
-void calc_relative(Display *disp, Window win, struct neko_diff *diff) {
-    get_neko_pos(disp, win, True, &(diff->rel_x), &(diff->rel_y));
-    // diff->rel_x -= neko_width / 2;
-    // diff->rel_y -= neko_height ;
-    // printf("rel_x = %d, rel_y = %d\n", diff->rel_x, diff->rel_y);
 
+void change_state(int ch_state) {
+    state_count = 0;
+    tick_count = 0;
+
+    neko_state = ch_state;
 }
+
 
 void calc_dxy(Display *disp, Window win, int *x_move, int *y_move) {
     double speed = neko_speed;
@@ -408,8 +322,6 @@ void calc_dxy(Display *disp, Window win, int *x_move, int *y_move) {
         *y_move = 0;
     }
 }
-
-
 void calc_angle() {
     if (coords.angle < 35 && coords.angle >= -35) {
         neko_state = RIGHT;
@@ -425,35 +337,107 @@ void calc_angle() {
         neko_state = UPLEFT;
     } else if (coords.angle > -120 && coords.angle <= -70) {
         neko_state = UP;
-    } 
+    } else if (coords.angle > -70 && coords.angle < -35) {
+        neko_state = UPRIGHT;
+    }
     // TODO: do rest properly, two upleft upright, get pixmap error
 }
 
-void neko_move(Display *disp, Window win, XWindowChanges *change) {
+void neko_move(Display *disp, Window win) {
     int neko_x, neko_y;
     get_neko_pos(disp, win, False, &neko_x, &neko_y);
 
-    if (change->x == 0 && change->y == 0) {
-        change->x = neko_x;
-        change->y = neko_y;
+    if (win_change.x == 0 && win_change.y == 0) {
+        win_change.x = neko_x;
+        win_change.y = neko_y;
     }
-    // change->x += 0.13 * diff.rel_x;
-    // change->y += 0.13 * diff.rel_y;
+
     int x_move; int y_move;
     calc_dxy(disp, win, &x_move, &y_move);
     calc_angle();
-    change->x += x_move;
-    change->y += y_move;
+    win_change.x += x_move;
+    win_change.y += y_move;
 
-    XConfigureWindow(disp, win, move_value_mask, change);
+    XConfigureWindow(disp, win, move_value_mask, &win_change);
+    XFlush(disp);
 }
 
 
-void change_state() {
-    // if (!neko_still && (neko_state == IDLE || neko_state == KAKI || neko_state == JARE || neko_state == SLEEP)) {
-    //     neko_state = AWAKE;
-    // }
+void state_timing(Display *disp, Window win, int x_move, int y_move) {
+    if (neko_state == IDLE || neko_state == JARE ||  neko_state == KAKI  || neko_state == AKUBI || neko_state == SLEEP) {
+        if ((x_move != 0 || y_move != 0) && neko_state != AWAKE) {
+            change_state(AWAKE);
+        }
+    }
+
+    switch (neko_state) {
+
+    case IDLE:
+        if (state_count < NEKO_IDLE_TIME) {
+            break;
+        }
+        if (x_move == 0 && y_move == 0) {
+            change_state(JARE);
+        }
+        break;
+    case JARE:
+        if (state_count < NEKO_JARE_TIME) {
+            break;
+        }
+        if (x_move == 0 && y_move == 0) {
+            change_state(KAKI);
+        }
+        break; 
+    case KAKI:
+        if (state_count < NEKO_KAKI_TIME) {
+            break;
+        }
+        if (x_move == 0 && y_move == 0) {
+            change_state(AKUBI);
+        }
+        break;
+    case AKUBI:
+        if (state_count < NEKO_AKUBI_TIME) {
+            break;
+        }
+        if (x_move == 0 && y_move == 0) {
+            change_state(SLEEP);
+        }
+        break;
+    case AWAKE:
+        if (state_count < NEKO_AWAKE_TIME) {
+            break;
+        }
+        if (x_move == 0 && y_move == 0) {
+            change_state(IDLE);
+        }
+        if (x_move != 0 || y_move != 0) {
+            neko_move(disp, win);
+        }
+        break;
+    case DOWN:
+    case DW_LEFT:
+    case DW_RIGHT:
+    case LEFT:
+    case RIGHT:
+    case UP:
+    case UPLEFT:
+    case UPRIGHT:
+        if (x_move == 0 && y_move == 0) {
+            change_state(IDLE);
+        }
+        if (x_move != 0 || y_move != 0) {
+            neko_move(disp, win);
+        }
+        break;
+    case SLEEP:
+        break;
+    default:
+        change_state(AWAKE);
+        break;
+    }
 }
+
 
 int main() {
     Display *disp;
@@ -475,32 +459,24 @@ int main() {
     neko_animate(disp, root_win, gc);
     XMapWindow(disp, root_win);  
 
-
-
-    // struct timespec tim, tim2;
-    // tim.tv_sec = 0;
-    // tim.tv_nsec = 125000000;
-
-    neko_state = SLEEP;
+    neko_state = AWAKE;
     anim_start = False;
 
-    XWindowChanges win_change;
     win_change.x = 0;
     win_change.y = 0;
-        
-
 
     XEvent event;
     int change_x, change_y;
     change_x = 1, change_y = 1;
+    int x_move, y_move;
+    calc_dxy(disp, root_win, &x_move, &y_move);
+
 
     for ( ;; ) {
         neko_animate(disp, root_win, gc);
+        state_timing(disp, root_win, x_move, y_move);
+        calc_dxy(disp, root_win, &x_move, &y_move);
 
-        neko_move(disp, root_win, &win_change);
-        // calc_dxy(disp, root_win);
-        // sleep_idle_anim(disp, root_win, gc, which);
-        // nanosleep(&tim, &tim2);
 
         while (XPending(disp)) {
             XNextEvent(disp, &event);
