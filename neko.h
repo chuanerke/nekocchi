@@ -11,6 +11,9 @@
 #include <unistd.h>
 #include <math.h>
 #include <time.h>
+#include <poll.h>
+#include <argp.h>
+#include <assert.h>
 
 #include "bitmaps/neko/neko.include"
 #include "bitmasks/neko/neko.mask.include"
@@ -24,3 +27,6 @@
 #define NEKO_AKUBI_TIME 6       
 #define NEKO_AWAKE_TIME 3
 #define NEKO_TOGI_TIME 10
+
+#define ENUM_STR(ENUM_VAL) #ENUM_VAL
+

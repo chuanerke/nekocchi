@@ -1,13 +1,8 @@
 #include "neko.h"
-#include <poll.h>
-#include <argp.h>
-
-#define ENUM_STR(ENUM_VAL) #ENUM_VAL
 
 #define neko_width 32
 #define neko_height 32
 
-// #define neko_speed 13
 #define SECOND 1000 
 #define PI 3.141592654
 
@@ -17,10 +12,7 @@
 
 static int w_depth;
 static uint32_t move_value_mask = CWX | CWY;
-
-static int neko_speed = 13;
-static int neko_time = 125;
-static int tick_count = 0;
+static XWindowChanges win_change;
 
 
 static char doc[] = "Oneko recreation in Xlib/C";
@@ -69,23 +61,6 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
 }
 
 
-static XWindowChanges win_change;
-
-struct neko_diff {
-    int rel_x;
-    int rel_y;
-};
-
-struct neko_coord {
-    int dx;
-    int dy;
-    double distance;
-    double angle;
-};
-
-static struct neko_coord coords;
-
-
 Pixmap awake, down1, down2, dtogi1, dtogi2;
 Pixmap dwleft1, dwleft2, dwright1, dwright2;
 Pixmap jare2, kaki1, kaki2, left1, left2;
@@ -131,7 +106,6 @@ struct anim_map maps[] =  {
     {&utogi1, &utogi1_mask, utogi1_bits, utogi1_mask_bits}, {&utogi2, &utogi2_mask, utogi2_bits, utogi2_mask_bits}
 };
 
-
 typedef enum {
     IDLE,
     AKUBI,
@@ -152,11 +126,57 @@ typedef enum {
     UTOGI
 } State;
 
-static State neko_state = AWAKE;
+struct still_state {
+    State state;
+    int count_time;
+    State next_state;
+};
+
+struct still_state still_states[5] = {
+    {IDLE, NEKO_IDLE_TIME, JARE}, {JARE, NEKO_JARE_TIME, KAKI},
+    {KAKI, NEKO_KAKI_TIME, AKUBI}, {AKUBI, NEKO_AKUBI_TIME, SLEEP},
+    {AWAKE, NEKO_AWAKE_TIME, IDLE}
+};
+
+// debug
+const char *state_str[] = {
+    ENUM_STR(IDLE),
+    ENUM_STR(JARE),
+    ENUM_STR(KAKI),
+    ENUM_STR(AKUBI),
+    ENUM_STR(AWAKE)
+};
+
+typedef struct {
+    int neko_speed;
+    int neko_time;
+    State neko_state;
+    int tick_count;
+    int state_count;
+} Neko;
+
+Neko neko = {
+    .neko_speed = 13, .neko_time = 125, 
+    .neko_state = AWAKE, .tick_count = 0, 
+    .state_count = 0
+};
+
+struct neko_diff {
+    int rel_x;
+    int rel_y;
+};
+
+struct neko_coord {
+    int dx;
+    int dy;
+    double distance;
+    double angle;
+};
+
+static struct neko_coord coords;
+
 static _Bool anim_start = False;
 static _Bool neko_still = True;
-
-static int state_count = 0;
 
 struct animation {
     Pixmap *xmp;
@@ -182,7 +202,6 @@ struct animation move_states[][2] = {
     {{&upright1, &upright1_mask}, {&upright2, &upright2_mask}},
     {{&utogi1, &utogi1_mask}, {&utogi2, &utogi2_mask}}
 };
-
 
 void init_anim_map(Display *disp) {
     int screen = DefaultScreen(disp);
@@ -244,7 +263,9 @@ Window create_win(Display *disp) {
 
 void set_hints(Display *disp, Window win) {
     XWMHints *wm_hints = XAllocWMHints();
+    assert(wm_hints != NULL);
     XSizeHints *wm_size = XAllocSizeHints();
+    assert(wm_size != NULL);
 
     wm_size->flags = USPosition | USSize | PMaxSize;
     wm_size->max_width = neko_width;
@@ -269,30 +290,6 @@ GC create_gc(Display *disp, Window win) {
 
     return gc;
 } 
-
-void poll_neko() {
-    struct pollfd ufd;
-    ufd.fd = -1;
-    ufd.events = POLLIN;
-
-    poll(&ufd, 1, neko_time);
-}
-
-void neko_animate(Display *disp, Window win, GC gc) {
-    XShapeCombineMask(disp, win, ShapeBounding, 0, 0, *(move_states[neko_state][(int)anim_start].mask), ShapeSet);
-    XCopyPlane(disp, *(move_states[neko_state][(int)anim_start].xmp), win, gc, 0, 0, neko_width, neko_height, 0, 0, 1);
-    XFlush(disp);
-
-    if (neko_state == SLEEP) {
-        anim_start = (tick_count >> 2) & 0x1;
-    } else {
-        anim_start = tick_count & 0x1;
-    }
-    tick_count++;
-    state_count += (tick_count & 0x1);
-
-    poll_neko();
-}
 
 void get_neko_pos(Display *disp, Window win, _Bool relative, int *neko_x, int *neko_y) {
     Window root_ret, child_ret;
@@ -334,17 +331,8 @@ void get_cursor_pos(Display *disp, Window win, int *cursor_x, int *cursor_y) {
     );
 }
 
-
-void change_state(State ch_state) {
-    state_count = 0;
-    tick_count = 0;
-
-    neko_state = ch_state;
-}
-
-
 void calc_dxy(Display *disp, Window win, int *x_move, int *y_move) {
-    double speed = neko_speed;
+    double speed = neko.neko_speed;
     int neko_x, neko_y;
     int cursor_x, cursor_y;
     double ratio;
@@ -372,22 +360,54 @@ void calc_dxy(Display *disp, Window win, int *x_move, int *y_move) {
 
 void calc_angle() {
     if (coords.angle < 25 && coords.angle >= -25) {
-        neko_state = RIGHT;
+        neko.neko_state = RIGHT;
     } else if (coords.angle >= 25 && coords.angle < 55) {
-        neko_state = DW_RIGHT;
+        neko.neko_state = DW_RIGHT;
     } else if (coords.angle >= 55 && coords.angle < 115) {
-        neko_state = DOWN;
+        neko.neko_state = DOWN;
     } else if (coords.angle >= 115 && coords.angle < 165) {
-        neko_state = DW_LEFT;
-    } else if ((coords.angle >= 165 && coords.angle <= 180) || (coords.angle >= -180 && coords.angle <= -155)) {
-        neko_state = LEFT;
+        neko.neko_state = DW_LEFT;
+    } else if ((coords.angle >= 165 && coords.angle <= 180) || 
+                (coords.angle >= -180 && coords.angle <= -155)) {
+        neko.neko_state = LEFT;
     } else if (coords.angle > -155 && coords.angle <= -115) {
-        neko_state = UPLEFT;
+        neko.neko_state = UPLEFT;
     } else if (coords.angle > -115 && coords.angle <= -60) {
-        neko_state = UP;
+        neko.neko_state = UP;
     } else if (coords.angle > -60 && coords.angle < -25) {
-        neko_state = UPRIGHT;
+        neko.neko_state = UPRIGHT;
     }
+}
+
+void change_state(State ch_state) {
+    neko.state_count = 0;
+    neko.tick_count = 0;
+
+    neko.neko_state = ch_state;
+}
+
+void poll_neko() {
+    struct pollfd ufd;
+    ufd.fd = -1;
+    ufd.events = POLLIN;
+
+    poll(&ufd, 1, neko.neko_time);
+}
+
+void neko_animate(Display *disp, Window win, GC gc) {
+    XShapeCombineMask(disp, win, ShapeBounding, 0, 0, *(move_states[neko.neko_state][(int)anim_start].mask), ShapeSet);
+    XCopyPlane(disp, *(move_states[neko.neko_state][(int)anim_start].xmp), win, gc, 0, 0, neko_width, neko_height, 0, 0, 1);
+    XFlush(disp);
+
+    if (neko.neko_state == SLEEP) {
+        anim_start = (neko.tick_count >> 2) & 0x1;
+    } else {
+        anim_start = neko.tick_count & 0x1;
+    }
+    neko.tick_count++;
+    neko.state_count += (neko.tick_count & 0x1);
+
+    poll_neko();
 }
 
 void neko_move(Display *disp, Window win, int x_move, int y_move) {
@@ -409,28 +429,7 @@ void neko_move(Display *disp, Window win, int x_move, int y_move) {
     XFlush(disp);
 }
 
-struct still_state {
-    State state;
-    int count_time;
-    State next_state;
-};
-
-struct still_state still_states[5] = {
-    {IDLE, NEKO_IDLE_TIME, JARE}, {JARE, NEKO_JARE_TIME, KAKI},
-    {KAKI, NEKO_KAKI_TIME, AKUBI}, {AKUBI, NEKO_AKUBI_TIME, SLEEP},
-    {AWAKE, NEKO_AWAKE_TIME, IDLE}
-};
-
-// debug
-const char * state_str[] = {
-    ENUM_STR(IDLE),
-    ENUM_STR(JARE),
-    ENUM_STR(KAKI),
-    ENUM_STR(AKUBI),
-    ENUM_STR(AWAKE)
-};
-
-size_t get_state_index(State check_state) {
+ssize_t get_state_index(State check_state) {
     size_t len = sizeof(still_states) / sizeof(still_states[0]);
     // printf("%d\n", len);
     for (size_t i = 0; i < len; i++) {
@@ -447,23 +446,26 @@ size_t get_state_index(State check_state) {
 
 void state_timing(Display *disp, Window win, int x_move, int y_move) {
     _Bool move = x_move == 0 && y_move == 0;
-    if (neko_state == IDLE || neko_state == JARE ||  neko_state == KAKI  || neko_state == AKUBI || neko_state == SLEEP) {
-        if (!move && neko_state != AWAKE) {
+    if (neko.neko_state == IDLE || neko.neko_state == JARE ||  
+        neko.neko_state == KAKI  || neko.neko_state == AKUBI || 
+        neko.neko_state == SLEEP) {
+        if (!move && neko.neko_state != AWAKE) {
             change_state(AWAKE);
         }
     }
 
-    switch (neko_state) {
+    switch (neko.neko_state) {
     case IDLE:
     case JARE:
     case KAKI:
     case AKUBI:
     case AWAKE:
-        size_t ind = get_state_index(neko_state);
+        ssize_t ind = get_state_index(neko.neko_state);
+        assert(ind != -1);
 
-        if (state_count < still_states[ind].count_time) break;
+        if (neko.state_count < still_states[ind].count_time) break;
         if (move) change_state(still_states[ind].next_state);
-        if (neko_state == AWAKE && !move) neko_move(disp, win, x_move, y_move);
+        if (neko.neko_state == AWAKE && !move) neko_move(disp, win, x_move, y_move);
         break;
 
     case DOWN:
@@ -523,14 +525,15 @@ int main(int argc, char **argv) {
 
     argp_parse(&argp, argc, argv, 0, 0, &arguments);
     
-    neko_speed = atoi(arguments.speed);
-    neko_time = atoi(arguments.time);
+    neko.neko_speed = atoi(arguments.speed);
+    neko.neko_time = atoi(arguments.time);
 
     Display *disp;
     Window root_win;
     GC gc;
 
-    disp = XOpenDisplay((char *)0);
+    assert((disp = XOpenDisplay((char *)0)) != NULL);
+    
     root_win = create_win(disp);
 
     // XSynchronize(disp, True);
@@ -543,7 +546,7 @@ int main(int argc, char **argv) {
     neko_animate(disp, root_win, gc);
     XMapWindow(disp, root_win);  
 
-    neko_state = IDLE;
+    neko.neko_state = IDLE;
     anim_start = False;
 
     win_change.x = 0;
