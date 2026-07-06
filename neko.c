@@ -12,15 +12,9 @@
 #define DOWN_ANGLE 90.0
 #define LEFT_ANGLE 180.0
 
-
-// TODO: Set cursors, improve structure, add color, improve angle logic
-// mouse_cursor.xbm
-
-
 static int w_depth;
 static uint32_t move_value_mask = CWX | CWY;
 static XWindowChanges win_change;
-
 
 static char doc[] = "Oneko recreation in Xlib/C";
 static char args_doc[] = "NEKOCCHI";
