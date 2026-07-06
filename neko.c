@@ -6,6 +6,13 @@
 #define SECOND 1000 
 #define PI 3.141592654
 
+#define ANGLE_DIFF 20.0
+#define UP_ANGLE 270.0
+#define RIGHT_ANGLE 360.0
+#define DOWN_ANGLE 90.0
+#define LEFT_ANGLE 180.0
+
+
 // TODO: Set cursors, improve structure, add color, improve angle logic
 // mouse_cursor.xbm
 
@@ -105,6 +112,10 @@ struct anim_map maps[] =  {
     {&upright1, &upright1_mask, upright1_bits, upright1_mask_bits}, {&upright2, &upright2_mask, upright2_bits, upright2_mask_bits},
     {&utogi1, &utogi1_mask, utogi1_bits, utogi1_mask_bits}, {&utogi2, &utogi2_mask, utogi2_bits, utogi2_mask_bits}
 };
+
+Pixmap cursor_map;
+Pixmap cursor_mask;
+
 
 typedef enum {
     IDLE,
@@ -291,6 +302,34 @@ GC create_gc(Display *disp, Window win) {
     return gc;
 } 
 
+void set_cursor(Display *disp, Window win, Cursor *cursor) {
+    int screen = DefaultScreen(disp);
+    XColor sc_black, ex_black;
+    XColor sc_white, ex_white;
+
+    
+    cursor_mask = XCreatePixmapFromBitmapData(
+        disp, RootWindow(disp, screen), mouse_cursor_mask_bits, mouse_cursor_mask_width, mouse_cursor_mask_height, 
+        1, 0, 1
+    );
+
+    cursor_map = XCreatePixmapFromBitmapData(
+        disp, RootWindow(disp, screen), mouse_cursor_bits, mouse_cursor_width, mouse_cursor_height, 
+        1, 0, 1
+    );
+
+    XAllocNamedColor(disp, XDefaultColormap(disp, screen), "black", &sc_black, &ex_black);
+    XAllocNamedColor(disp, XDefaultColormap(disp, screen), "white", &sc_white, &ex_white);
+
+    *cursor = XCreatePixmapCursor(
+        disp, cursor_map, cursor_mask, 
+        &ex_black, &ex_white, 
+        mouse_cursor_x_hot, mouse_cursor_y_hot
+    );
+
+    XDefineCursor(disp, win, *cursor);
+}
+
 void get_neko_pos(Display *disp, Window win, _Bool relative, int *neko_x, int *neko_y) {
     Window root_ret, child_ret;
     int root_x, root_y, win_x, win_y;
@@ -358,24 +397,27 @@ void calc_dxy(Display *disp, Window win, int *x_move, int *y_move) {
     }
 }
 
+
 void calc_angle() {
-    if (coords.angle < 25 && coords.angle >= -25) {
-        neko.neko_state = RIGHT;
-    } else if (coords.angle >= 25 && coords.angle < 55) {
-        neko.neko_state = DW_RIGHT;
-    } else if (coords.angle >= 55 && coords.angle < 115) {
-        neko.neko_state = DOWN;
-    } else if (coords.angle >= 115 && coords.angle < 165) {
-        neko.neko_state = DW_LEFT;
-    } else if ((coords.angle >= 165 && coords.angle <= 180) || 
-                (coords.angle >= -180 && coords.angle <= -155)) {
-        neko.neko_state = LEFT;
-    } else if (coords.angle > -155 && coords.angle <= -115) {
-        neko.neko_state = UPLEFT;
-    } else if (coords.angle > -115 && coords.angle <= -60) {
+    if (coords.angle <= 0) coords.angle = 360 - (-coords.angle);
+    printf("%f\n", coords.angle);
+
+    if (coords.angle > UP_ANGLE - ANGLE_DIFF && coords.angle <= UP_ANGLE + ANGLE_DIFF) {
         neko.neko_state = UP;
-    } else if (coords.angle > -60 && coords.angle < -25) {
+    } if (coords.angle > UP_ANGLE + ANGLE_DIFF && coords.angle <= RIGHT_ANGLE - ANGLE_DIFF) {
         neko.neko_state = UPRIGHT;
+    } if ((coords.angle > RIGHT_ANGLE - ANGLE_DIFF && coords.angle <= RIGHT_ANGLE) || coords.angle <= ANGLE_DIFF){
+        neko.neko_state = RIGHT;
+    } if (coords.angle > ANGLE_DIFF && coords.angle <= DOWN_ANGLE - ANGLE_DIFF) {
+        neko.neko_state = DW_RIGHT;
+    } if (coords.angle > DOWN_ANGLE - ANGLE_DIFF && coords.angle <= DOWN_ANGLE + ANGLE_DIFF) {
+        neko.neko_state = DOWN;
+    } if (coords.angle > DOWN_ANGLE + ANGLE_DIFF && coords.angle <= LEFT_ANGLE - ANGLE_DIFF) {
+        neko.neko_state = DW_LEFT;
+    } if (coords.angle > LEFT_ANGLE - ANGLE_DIFF && coords.angle <= LEFT_ANGLE + ANGLE_DIFF) {
+        neko.neko_state = LEFT;
+    } if (coords.angle > LEFT_ANGLE + ANGLE_DIFF && coords.angle <= UP_ANGLE - ANGLE_DIFF) {
+        neko.neko_state = UPLEFT;
     }
 }
 
@@ -404,8 +446,9 @@ void neko_animate(Display *disp, Window win, GC gc) {
     } else {
         anim_start = neko.tick_count & 0x1;
     }
-    neko.tick_count++;
     neko.state_count += (neko.tick_count & 0x1);
+
+    neko.tick_count++;
 
     poll_neko();
 }
@@ -488,15 +531,18 @@ void state_timing(Display *disp, Window win, int x_move, int y_move) {
     }
 }
 
-void free_resources(Display *disp, Window root_win, GC gc) {
+void free_resources(Display *disp, Window root_win, GC gc, Cursor cursor) {
     XFreeGC(disp, gc);
     free_pixmaps(disp);
+    XFreePixmap(disp, cursor_map);
+    XFreePixmap(disp, cursor_mask);
+    XFreeCursor(disp, cursor);
     XDestroyWindow(disp, root_win);
     XCloseDisplay(disp);
     exit(1);
 }
 
-void event_handler(Display *disp, Window root_win, GC gc, XEvent event) {
+void event_handler(Display *disp, Window root_win, GC gc, XEvent event, Cursor cursor) {
     while (XPending(disp)) {
         XNextEvent(disp, &event);
         switch (event.type) {
@@ -506,7 +552,7 @@ void event_handler(Display *disp, Window root_win, GC gc, XEvent event) {
             break;
         case ButtonPress:
             if (event.xbutton.button == Button1) {
-                free_resources(disp, root_win, gc);
+                free_resources(disp, root_win, gc, cursor);
             }
             break;
         case VisibilityNotify:
@@ -532,10 +578,14 @@ int main(int argc, char **argv) {
     Window root_win;
     GC gc;
 
+    Cursor cursor;
+
     assert((disp = XOpenDisplay((char *)0)) != NULL);
     root_win = create_win(disp);
     set_hints(disp, root_win);
     gc = create_gc(disp, root_win);
+
+    set_cursor(disp, root_win, &cursor);
 
     init_anim_map(disp);
     neko_animate(disp, root_win, gc);
@@ -557,7 +607,7 @@ int main(int argc, char **argv) {
         state_timing(disp, root_win, x_move, y_move);
         calc_dxy(disp, root_win, &x_move, &y_move);
 
-        event_handler(disp, root_win, gc, event);
+        event_handler(disp, root_win, gc, event, cursor);
     }
 
     return 0;

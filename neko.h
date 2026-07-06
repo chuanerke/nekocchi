@@ -17,6 +17,7 @@
 
 #include "bitmaps/neko/neko.include"
 #include "bitmasks/neko/neko.mask.include"
+#include "cursors/cursor.include"
 
 #define NEKO_DEPTH 1
 
